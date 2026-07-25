@@ -8,7 +8,7 @@ Phase 0 (Monorepo scaffold) and Phase 1 (Backend foundation) are both **reviewed
 
 ## Current task
 
-Finalizing Git history for the approved Phase 0 + Phase 1 work: this documentation update, followed by the implementation commit(s), followed by a short documentation commit recording the resulting hash(es). Phase 2 has not started and will not start until a separate task requests it.
+Phase 0 and Phase 1 are approved, committed, and closed out (see Git history below). Phase 2 has not started and will not start until a separate task requests it.
 
 ## Review status
 
@@ -104,4 +104,9 @@ Full command-by-command validation evidence for each phase lives in the chronolo
 
 ## Git history
 
-- Commit strategy and resulting hash(es) for the approved Phase 0 + Phase 1 work will be recorded here immediately after the commit(s) are created in this same session — see the commit(s) below.
+Commit strategy: the working tree separated cleanly into two coherent commits by whole-file selective staging (no file content was rewritten to force a split). Files whose current content is only meaningful given Phase 1 (root `README.md`, `.vscode/tasks.json` — both describe the `-Dspring-boot.run.profiles=local` requirement) were staged with the backend-foundation commit rather than the scaffold commit, so each commit's checked-out state is internally consistent on its own.
+
+- `d349060` — `chore: scaffold ReturnFlow monorepo` (Phase 0).
+- `76228c9` — `feat(api): establish backend foundation` (Phase 1, includes the Postgres host-port-5433 decision on the `apps/api` side and the README/VS Code task updates it required).
+
+Both commits are on top of `4b93e06` (`Initial commit`, spec/docs only) on `master`. This documentation update is recorded in a following `docs: record approved initial phases` commit.
