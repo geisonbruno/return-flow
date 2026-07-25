@@ -1,24 +1,71 @@
-# ReturnFlow Blueprint
+# ReturnFlow
 
-This package contains the agreed ReturnFlow V1 product and technical specification.
+ReturnFlow is a multi-tenant B2B SaaS that digitizes the product-return workflow — from the driver who records a return to the warehouse admin who reviews, closes, and prints it. See `CLAUDE.md` for the full product specification and `docs/IMPLEMENTATION_PLAN.md` for the phased build plan.
 
-## Files
+## Repository layout
 
-- `CLAUDE.md` — global product source of truth
-- `apps/api/CLAUDE.md` — Spring Boot API instructions
-- `apps/web/CLAUDE.md` — React admin web instructions
-- `apps/mobile/CLAUDE.md` — React Native + Expo instructions
-- `docs/DIAGRAMS.md` — Mermaid architecture/domain/workflow diagrams
-- `docs/IMPLEMENTATION_PLAN.md` — incremental build plan
-- `BOOTSTRAP_PROMPT.md` — first prompt to paste into Claude Code
+```text
+returnflow/
+├── apps/
+│   ├── api/      Spring Boot backend (Java 21, Maven Wrapper)
+│   ├── web/      Admin console (React + TypeScript + Vite)
+│   └── mobile/   Driver app (React Native + Expo)
+├── docs/         Architecture diagrams and implementation plan
+├── infra/        Local development infrastructure (Docker Compose)
+└── scripts/      Reserved for future automation
+```
 
-## Recommended use
+Each app has its own dependencies, build, lint, and test commands, and deploys independently.
 
-1. Create an empty GitHub repository named `returnflow`.
-2. Copy this blueprint into the repository root.
-3. Open the repository in Claude Code.
-4. Paste the content of `BOOTSTRAP_PROMPT.md`.
-5. Review Phase 0 before allowing Phase 1.
-6. Commit each approved phase separately.
+## Prerequisites
 
-Do not ask Claude Code to implement the full product in one step.
+- Java 21 (Temurin recommended)
+- Node.js 20.19+ or 22.12+ (Expo's CLI enforces this minimum)
+- Docker Desktop (for local Postgres/MinIO)
+
+## Local development (Windows PowerShell)
+
+### 1. Infrastructure (PostgreSQL + MinIO)
+
+```powershell
+docker compose -f infra/docker-compose.yml up -d
+```
+
+Copy `infra/.env.example` to `infra/.env` to override the default local credentials/ports if needed.
+
+### 2. API
+
+```powershell
+cd apps/api
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+Runs at `http://localhost:8080` against the Postgres started in step 1 (no datasource is configured without an explicit profile, so the app refuses to start otherwise). Run tests with `.\mvnw.cmd test` — they spin up their own ephemeral Postgres via Testcontainers, independent of the Docker Compose instance.
+
+### 3. Web
+
+```powershell
+cd apps/web
+npm install
+npm run dev
+```
+
+Runs at `http://localhost:5173`. Copy `apps/web/.env.example` to `.env` first.
+
+### 4. Mobile
+
+```powershell
+cd apps/mobile
+npm install
+npx expo start
+```
+
+Copy `apps/mobile/.env.example` to `.env` first.
+
+## VS Code tasks
+
+`.vscode/tasks.json` provides: Start/Stop Infrastructure, Run API, Run API Tests, Run Web, Run Web Tests, Run Mobile, Run Mobile Tests.
+
+## Contributing
+
+Development happens in small, reviewable phases — see `docs/IMPLEMENTATION_PLAN.md` and `progress.md` for current status. Read `CLAUDE.md` (and the nearest `apps/*/CLAUDE.md`) before making product or architecture decisions.

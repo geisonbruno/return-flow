@@ -1,0 +1,4 @@
+-- Phase 1 establishes the Flyway migration mechanism itself, with no
+-- business schema yet (per Phase 1 scope: no tenant/user/route/return
+-- tables). The first schema-bearing migration arrives together with the
+-- entities and business rules it supports, in a later phase.
