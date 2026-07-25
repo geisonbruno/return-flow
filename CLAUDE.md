@@ -1100,7 +1100,7 @@ Expected services:
 ```text
 API       http://localhost:8080
 Web       http://localhost:5173
-Postgres  localhost:5432
+Postgres  localhost:5433 (host port; container's internal Postgres port is still 5432 — 5433 avoids clashing with a native local Postgres install)
 MinIO     local S3-compatible endpoints
 Mobile    Expo development server
 ```
@@ -1375,7 +1375,7 @@ A feature is complete only when:
 
 ---
 
-## 38. Instructions for Claude Code
+## 38. Development Instructions
 
 When working on ReturnFlow:
 
@@ -1394,6 +1394,134 @@ When working on ReturnFlow:
 13. When a product decision is missing, surface the ambiguity instead of inventing a major rule.
 14. Prefer a working simple implementation over an impressive architecture.
 15. Preserve the monorepo and independent deploy model.
+
+---
+
+---
+
+## 38.5 Development Workflow
+
+This workflow is mandatory for every future implementation, regardless of the AI model, IDE, or coding assistant being used.
+
+The goal is to preserve development continuity, maintain small reviewable changes, and ensure project documentation always reflects the current implementation.
+
+### Session startup
+
+Before starting any implementation:
+
+1. Read `CLAUDE.md`.
+2. Read `progress.md`.
+3. Identify the current implementation phase.
+4. Continue only from the latest approved phase.
+5. Never skip unfinished work.
+
+If `progress.md` does not exist, create it before implementing new features.
+
+---
+
+### Progress tracking
+
+The repository must always contain a `progress.md` file in the project root.
+
+This file is the current development state of the project.
+
+It must contain at least:
+
+- Current phase
+- Current task
+- Completed phases
+- Pending phases
+- Current status
+- Important architectural decisions
+- Known issues
+- Chronological implementation history
+
+Update `progress.md` whenever an implementation phase is completed.
+
+Never overwrite previous progress entries.
+
+Always append new progress chronologically.
+---
+
+### Documentation
+
+Documentation is considered part of the source code.
+
+Whenever implementation changes the architecture, workflow, business rules, or important technical decisions:
+
+- update `CLAUDE.md` if the project specification changed;
+- update `progress.md`;
+- update `README.md` if project setup changes.
+
+Documentation must never become outdated.
+
+Whenever an architectural or business decision changes during development, update this document before implementing dependent features.
+
+---
+
+### Incremental implementation
+
+Always work in small implementation phases.
+
+Never implement multiple roadmap phases unless explicitly requested.
+
+Every phase should leave the repository in a working state.
+
+Prefer small reviewable changes over large feature drops.
+
+---
+
+### Commit strategy
+
+Each approved implementation phase should generate one Git commit.
+
+Recommended workflow:
+
+Implementation
+
+↓
+
+Developer Review
+
+↓
+
+Approval
+
+↓
+
+Update progress.md
+
+↓
+
+Git Commit
+
+↓
+
+Next Phase
+
+Never combine multiple approved phases into a single commit.
+
+---
+
+### Progress quality
+
+The purpose of `progress.md` is not only to record completed work, but also to explain why important implementation decisions were made.
+
+Prefer documenting architectural reasoning over simply listing completed tasks.
+
+---
+
+### Source of truth
+
+Before making implementation decisions, consult these files in order:
+
+1. `CLAUDE.md`
+2. `progress.md`
+3. `docs/IMPLEMENTATION_PLAN.md`
+
+If conflicting information exists, `CLAUDE.md` has priority.
+
+If information is missing, ask for clarification instead of inventing new business rules.
 
 ---
 
@@ -1426,3 +1554,13 @@ The following are considered decided for V1:
 - separate builds and deploys from one repository.
 
 Any change to these decisions must be intentional and documented.
+
+--- 
+
+After a phase has been approved by the developer, update progress.md one final time to:
+
+- mark the review as approved;
+- record the Git commit hash;
+- summarize the completed phase if detailed implementation notes are no longer necessary.
+
+Only then create the Git commit.
