@@ -2,45 +2,51 @@
 
 ## Current phase
 
-Phase 2 — Tenant bootstrap, authentication, users, and routes. Not yet started.
+**Phase 2B — Authentication.** Not yet started.
 
-Phase 0 (Monorepo scaffold) and Phase 1 (Backend foundation) are both **reviewed and approved** by the developer.
+Phase 0 (Monorepo scaffold), Phase 1 (Backend foundation), and Phase 2A (Tenant Foundation) are all **reviewed and approved** by the developer.
 
 ## Current task
 
-Phase 0 and Phase 1 are approved, committed, and closed out (see Git history below). Phase 2 has not started and will not start until a separate task requests it.
+Phase 2A is approved and closed out (see Git history below). Phase 2B has not started and will not start until a separate task requests it.
 
 ## Review status
 
 - Phase 0 — Monorepo scaffold — **approved**.
 - Phase 1 — Backend foundation — **approved**.
+- Phase 2A — Tenant Foundation — **approved**.
 
 ## Completed phases
 
 - Phase 0 — Monorepo scaffold (approved 2026-07-26).
 - Phase 1 — Backend foundation (approved 2026-07-26).
+- Phase 2A — Tenant Foundation (approved 2026-07-28).
 
 ## Pending phases
 
-- Phase 2 — Tenant bootstrap, authentication, users, and routes
-- Phase 3 — Return reasons and core return domain
+- Phase 2B — Authentication
+- Phase 2C — Administration Foundation (routes, user/route CRUD)
+- Phase 3A — Return domain model
+- Phase 3B — Driver API
 - Phase 4 — Mobile driver workflow
 - Phase 5 — Photos and customer signature
-- Phase 6 — Web returns list and operational summary
-- Phase 7 — Warehouse review and concurrency
-- Phase 8 — User and route management UI
+- Phase 6 — Operational dashboard
+- Phase 7 — Warehouse review
+- Phase 8 — Administration UI
 - Phase 9 — PDF
-- Phase 10 — CI/CD and pilot deployment
+- Phase 10 — Deployment
 
 ## Current status
 
 All three apps scaffold, build, and pass their checks; the API additionally has a working database/migration/error-handling/OpenAPI foundation:
 
-- `apps/api`: Spring Boot 4.1.0 / Java 21. `mvnw test` (4/4, Testcontainers-backed) and `mvnw package` pass. PostgreSQL + Flyway + Hibernate-validate + `ProblemDetail` error handling + OpenAPI + Actuator all in place (Phase 1). No business/tenant code yet, by design.
+- `apps/api`: Spring Boot 4.1.0 / Java 21. `mvnw test` (11/11, Testcontainers-backed) and `mvnw package` pass. PostgreSQL + Flyway + Hibernate-validate + `ProblemDetail` error handling + OpenAPI + Actuator (Phase 1), plus a `tenant` table with a bootstrapped default tenant and a request-scoped `TenantContext` every request resolves into (Phase 2A). No auth/users/routes/returns yet, by design.
 - `apps/web`: Vite + React 19 + TypeScript (strict). `lint`, `typecheck`, `build`, `test` all pass.
 - `apps/mobile`: Expo SDK 57 + TypeScript (strict). `typecheck` and `test` pass. `lint`/`expo start` remain blocked by a local Node version gate — see Known issues.
-- `infra/docker-compose.yml`: Postgres 16 + MinIO, both verified healthy. **Postgres now defaults to host port `5433`** (container-internal port is still the standard `5432`) — see "Local PostgreSQL host port decision" below.
-- Dev experience: root `.editorconfig`, `.gitignore`, `.vscode/tasks.json`, path-filtered GitHub Actions, env `.env.example` files, root/app READMEs — all consistent with the port change.
+- `infra/docker-compose.yml`: Postgres 16 + MinIO, both verified healthy. Postgres defaults to host port `5433` (container-internal port is still the standard `5432`) — see "Local PostgreSQL host port decision" below.
+- Dev experience: root `.editorconfig`, `.gitignore`, `.vscode/tasks.json`, path-filtered GitHub Actions, env `.env.example` files, root/app READMEs.
+
+**Phase 2A:** the API now has a real `tenant` table, a bootstrapped default "Warehouse" tenant, and every HTTP request resolves to that tenant via a servlet filter into a request-scoped `TenantContext`. `mvnw test` — **11/11 pass** (7 new tenant tests on top of Phase 1's 4). No auth/users/routes/returns — strictly infrastructure, per phase scope. Full detail in the Chronological history entry below.
 
 Full command-by-command validation evidence for each phase lives in the chronological history below; this section intentionally stays high-level.
 
@@ -75,7 +81,17 @@ Full command-by-command validation evidence for each phase lives in the chronolo
   - `SpringPhysicalNamingStrategy` was removed entirely in Boot 4; Hibernate's own default naming strategy already produces this project's `snake_case` convention, so nothing was lost by not setting it.
   - `HibernateJpaConfiguration` and friends now live under `org.springframework.boot.hibernate.autoconfigure`.
 
-**Finalization (this session):** the local PostgreSQL host port decision above is the only architectural change made while closing out Phases 0–1; no new product functionality or capability was introduced, per this task's explicit scope.
+**Finalization (2026-07-26):** the local PostgreSQL host port decision above is the only architectural change made while closing out Phases 0–1; no new product functionality or capability was introduced, per that task's explicit scope.
+
+**Phase 2A:**
+
+- **`TenantContext` is a static `ThreadLocal` holder, modeled directly on Spring Security's `SecurityContextHolder`.** It's the same well-established pattern for propagating request-scoped identity without threading a parameter through every call site; callers only ever see `set`/`get`/`clear`, never the storage mechanism, per this phase's explicit requirement.
+- **`TenantContext` stores the resolved `Tenant` entity itself, not just its ID.** Simplest option for now (matches the literal "store current tenant" wording and avoids a repository round-trip everywhere the current tenant is needed); worth revisiting if a lighter identifier-only context is needed once real tenant-scoped queries start using it in Phase 3+.
+- **`TenantFilter` is registered explicitly via a `FilterRegistrationBean`, not `@Component`.** A plain component-scanned `Filter` bean is auto-included by `@WebMvcTest` slices anywhere in the app (Spring Boot's web-slice inclusion matches on bean *type*, `Filter`, regardless of which package declares it) — this broke Phase 1's existing `GlobalExceptionHandlerTest` slice, which has no database configured, once `TenantFilter`'s `TenantResolver → TenantRepository` dependency chain got pulled in. Wrapping registration in a `FilterRegistrationBean` (declared in `TenantFilterConfig`, not a `Filter`-typed bean itself) keeps `TenantFilter` out of unrelated web slices while still applying to every real request. Found and fixed against an actual failing `mvnw test` run, not guessed.
+- **Bootstrap idempotency is a simple check-then-create (`existsBySlug` then `save`), not a transactional upsert or explicit concurrency guard.** The unique constraint on `tenant.slug` (`uk_tenant_slug`) is the actual correctness guarantee against duplicates; the check is just an optimization to avoid a constraint-violation exception on the common path. This is intentionally not hardened further for concurrent multi-instance startup, which doesn't exist for this single-instance pilot — revisit if/when the API ever runs with more than one replica.
+- **No "tenant isolation" tests in this phase**, despite `docs/IMPLEMENTATION_PLAN.md` listing it as a Phase 2A deliverable. There is exactly one tenant and no tenant-scoped business data yet (no user/route/return tables), so there is nothing to isolate from anything else — a test asserting isolation today would only be able to assert against itself. Real isolation tests belong with the first tenant-owned business entities (Phase 2B/2C onward), where a second tenant and cross-tenant access attempt can be meaningfully constructed. Same "explicit phase instructions narrow the plan doc" precedent as Phase 1's tenant-entity deviation.
+- **Every request resolves the tenant via a database lookup (`findBySlug`) with no caching.** Matches "current implementation always resolves the default Warehouse tenant" literally; acceptable for a single-tenant pilot. Caching or a cheaper resolution path is a reasonable, deliberately deferred optimization once `TenantResolver` grows real per-request resolution logic (JWT/headers) in a later phase.
+- **`Auditable` (`createdAt`/`updatedAt` via Spring Data JPA auditing, `@MappedSuperclass` + `@EnableJpaAuditing`) is the first entry in `common/`'s base-entity conventions**, established here specifically because this phase asked for it ahead of the first real entity (`Tenant`). No `createdBy`/`updatedBy` — no authenticated user exists yet to attribute them to.
 
 ## Known issues
 
@@ -101,6 +117,16 @@ Full command-by-command validation evidence for each phase lives in the chronolo
     - `apps/api`: `.\mvnw.cmd test` — **4/4 pass** (Testcontainers-backed, unaffected by the host port change by construction). `.\mvnw.cmd package` — **BUILD SUCCESS**.
     - Manual smoke test: `.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local` with **no manual port override** — started cleanly on the first attempt. `GET /actuator/health` → `200`, `db` sub-status `UP`. `GET /v3/api-docs` → correct title/description/version. `flyway_schema_history` in the real database confirmed migration `1 - baseline` applied successfully.
   - This documentation update. Implementation commit(s) and their hashes are recorded immediately below once created — see "Git history" section.
+- 2026-07-26 — **Phase 2A (Tenant Foundation) implemented and validated, left pending review** (no commit, per that phase's explicit stop condition). Infrastructure only — no auth/users/routes/returns:
+  - `com.returnflow.tenant.Tenant` entity (`id`, `name`, `slug` unique, `status` enum, `createdAt`/`updatedAt` via the new `Auditable` base class) + `V2__create_tenant_table.sql` + `TenantRepository` (basic CRUD + two derived-query lookups by slug).
+  - `TenantBootstrap` (`ApplicationRunner`): creates the default `Warehouse`/`warehouse`/`ACTIVE` tenant on startup if it doesn't already exist.
+  - `TenantContext` (static `ThreadLocal` holder), `TenantResolver`/`DefaultTenantResolver` (always resolves the Warehouse tenant), `TenantFilter` + `TenantFilterConfig` (resolves the tenant for every request into `TenantContext`, always clears it afterward — including on exceptions — registered via `FilterRegistrationBean` specifically to avoid leaking into unrelated `@WebMvcTest` slices; see Architectural decisions for why).
+  - `common.audit.Auditable` (`@MappedSuperclass`, `createdAt`/`updatedAt` only) + `config.JpaAuditingConfig` (`@EnableJpaAuditing`) — the base auditing convention for all future entities.
+  - New tests: `TenantContextTest` (set/get/clear, plus cross-thread isolation), `TenantBootstrapIntegrationTest` (default tenant exists after startup; re-invoking bootstrap logic directly proves no duplicate), `TenantFilterIntegrationTest` (a real request resolves to `warehouse` and `TenantContext` is empty afterward; same for a request that throws) — the latter two use a test-only fixture controller (`tenant/support/TenantProbeController`, never shipped in main), mirroring Phase 1's established `common/error/support/TestFixtureController` pattern.
+  - Hit and fixed one real cross-cutting issue: registering `TenantFilter` as a plain `@Component` broke Phase 1's `GlobalExceptionHandlerTest` (`@WebMvcTest` auto-includes any `Filter`-typed bean regardless of source package, pulling in a database dependency that slice doesn't configure) — found via an actual failing `mvnw test`, fixed by registering through `FilterRegistrationBean` instead.
+  - **Validation, all real (Docker running throughout):** `mvnw test` → **11/11 pass** (4 pre-existing + 7 new). `mvnw package` → **BUILD SUCCESS**, no new warnings. Manual smoke test: started the app twice in a row against the real Docker Compose Postgres (`-Dspring-boot.run.profiles=local`) — `flyway_schema_history` shows both `1 - baseline` and `2 - create tenant table` applied successfully; `tenant` table has exactly **one** `Warehouse`/`ACTIVE` row after the *first* startup, and still exactly **one** row after a full second restart (proves bootstrap idempotency on a real process restart, not just an in-JVM re-invocation); `/actuator/health` and `/v3/api-docs` both `200` after each startup, confirming requests flow through `TenantFilter` without error.
+  - Not implemented (out of scope, per this phase): "tenant isolation tests" from `docs/IMPLEMENTATION_PLAN.md`'s Phase 2A listing — see Architectural decisions for why (nothing tenant-scoped exists yet to isolate).
+- 2026-07-28 — **Phase 2A reviewed and approved by the developer.** No re-implementation or re-validation was needed — this session finalizes the documentation and Git history for the work already validated above. See Git history for the resulting commit(s).
 
 ## Git history
 
@@ -108,5 +134,7 @@ Commit strategy: the working tree separated cleanly into two coherent commits by
 
 - `d349060` — `chore: scaffold ReturnFlow monorepo` (Phase 0).
 - `76228c9` — `feat(api): establish backend foundation` (Phase 1, includes the Postgres host-port-5433 decision on the `apps/api` side and the README/VS Code task updates it required).
+- `2f09804` — `docs: record approved initial phases` (Phase 0/1 approval + commit hashes).
+- Phase 2A commit hash(es) recorded here immediately after creation — see below.
 
-Both commits are on top of `4b93e06` (`Initial commit`, spec/docs only) on `master`. This documentation update is recorded in a following `docs: record approved initial phases` commit.
+Both `d349060` and `76228c9` are on top of `4b93e06` (`Initial commit`, spec/docs only) on `master`.
