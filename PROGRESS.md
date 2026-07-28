@@ -135,6 +135,6 @@ Commit strategy: the working tree separated cleanly into two coherent commits by
 - `d349060` — `chore: scaffold ReturnFlow monorepo` (Phase 0).
 - `76228c9` — `feat(api): establish backend foundation` (Phase 1, includes the Postgres host-port-5433 decision on the `apps/api` side and the README/VS Code task updates it required).
 - `2f09804` — `docs: record approved initial phases` (Phase 0/1 approval + commit hashes).
-- Phase 2A commit hash(es) recorded here immediately after creation — see below.
+- `5dac36c` — `feat(api): establish tenant foundation` (Phase 2A: `Tenant` entity/migration/repository, bootstrap, `TenantContext`, `TenantResolver`, `TenantFilter`, `Auditable` base class, and their tests). `CLAUDE.md` and `docs/IMPLEMENTATION_PLAN.md` had pre-existing, unrelated local edits (phase-breakdown updates made outside this task) at the time of this commit; they were deliberately left out of it since they aren't part of Phase 2A's work.
 
-Both `d349060` and `76228c9` are on top of `4b93e06` (`Initial commit`, spec/docs only) on `master`.
+All commits are on top of `4b93e06` (`Initial commit`, spec/docs only) on `master`. This documentation update (recording the hash above) is captured in a following small commit.
