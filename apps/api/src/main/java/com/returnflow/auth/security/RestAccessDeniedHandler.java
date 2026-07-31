@@ -13,11 +13,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Counterpart to {@link RestAuthenticationEntryPoint} for the authenticated-
- * but-not-permitted case. No endpoint in this phase actually restricts by
- * role, so this is unexercised by current business logic — it exists so the
- * security filter chain is fully and correctly configured for when role
- * restrictions arrive (Phase 2C onward) rather than defaulting to Spring's
- * HTML response.
+ * but-not-permitted case. Exercised since Phase 2C by every
+ * {@code /api/v1/admin/**} request from an authenticated non-ADMIN user (see
+ * {@code SecurityConfig}'s {@code hasRole("ADMIN")} rule).
  */
 @Component
 class RestAccessDeniedHandler implements AccessDeniedHandler {

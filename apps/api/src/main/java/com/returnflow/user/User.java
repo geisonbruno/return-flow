@@ -43,12 +43,20 @@ public class User extends Auditable {
 	@Column(nullable = false)
 	private boolean active;
 
+	@Column(name = "route_id")
+	private UUID routeId;
+
 	protected User() {
 		// JPA
 	}
 
 	public User(UUID tenantId, UserRole role, String fullName, String email, String normalizedEmail,
 			String passwordHash, boolean active) {
+		this(tenantId, role, fullName, email, normalizedEmail, passwordHash, active, null);
+	}
+
+	public User(UUID tenantId, UserRole role, String fullName, String email, String normalizedEmail,
+			String passwordHash, boolean active, UUID routeId) {
 		this.tenantId = tenantId;
 		this.role = role;
 		this.fullName = fullName;
@@ -56,6 +64,21 @@ public class User extends Auditable {
 		this.normalizedEmail = normalizedEmail;
 		this.passwordHash = passwordHash;
 		this.active = active;
+		this.routeId = routeId;
+	}
+
+	/** Full replace, matching the admin API's PUT (full-update) semantics — see {@code user.UserAdminService}. */
+	public void update(String fullName, String email, String normalizedEmail, UserRole role, UUID routeId, boolean active) {
+		this.fullName = fullName;
+		this.email = email;
+		this.normalizedEmail = normalizedEmail;
+		this.role = role;
+		this.routeId = routeId;
+		this.active = active;
+	}
+
+	public void changePasswordHash(String passwordHash) {
+		this.passwordHash = passwordHash;
 	}
 
 	public UUID getId() {
@@ -88,5 +111,9 @@ public class User extends Auditable {
 
 	public boolean isActive() {
 		return active;
+	}
+
+	public UUID getRouteId() {
+		return routeId;
 	}
 }

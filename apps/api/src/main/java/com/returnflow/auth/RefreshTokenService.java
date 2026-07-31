@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,7 +30,7 @@ import org.springframework.stereotype.Service;
  * standard JDK primitive, not a hand-rolled algorithm.
  */
 @Service
-class RefreshTokenService {
+public class RefreshTokenService {
 
 	private static final int TOKEN_BYTES = 32;
 
@@ -38,7 +39,7 @@ class RefreshTokenService {
 	private final Clock clock;
 	private final SecureRandom random = new SecureRandom();
 
-	RefreshTokenService(RefreshTokenRepository repository, AuthSecurityProperties properties, Clock clock) {
+	public RefreshTokenService(RefreshTokenRepository repository, AuthSecurityProperties properties, Clock clock) {
 		this.repository = repository;
 		this.ttl = properties.refreshToken().ttl();
 		this.clock = clock;
@@ -67,6 +68,18 @@ class RefreshTokenService {
 
 	void revokeIfPresent(String rawToken) {
 		repository.findByTokenHash(hash(rawToken)).ifPresent(this::revoke);
+	}
+
+	/**
+	 * Used by the admin password-reset flow ({@code user.UserAdminService}):
+	 * an ADMIN-issued password reset invalidates every existing session for
+	 * that user, not just one token the caller happens to know.
+	 */
+	public void revokeAllForUser(UUID userId) {
+		Instant now = clock.instant();
+		List<RefreshTokenSession> sessions = repository.findByUserId(userId);
+		sessions.forEach(session -> session.revoke(now));
+		repository.saveAll(sessions);
 	}
 
 	private static String hash(String rawToken) {
