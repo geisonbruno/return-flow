@@ -9,8 +9,11 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Test-only fixture (never shipped in main) that reports what
  * {@link TenantContext} holds while a real request is being handled — the
- * only way to observe {@link com.returnflow.tenant.TenantFilter}'s effect
- * from outside the filter itself.
+ * only way to observe {@code auth.security.JwtAuthenticationFilter}'s effect
+ * from outside the filter itself. Since Phase 2B, reaching this controller
+ * at all requires a valid access token (it isn't in the security allowlist),
+ * so every request here is implicitly an authenticated-tenant-resolution
+ * scenario.
  */
 @RestController
 @RequestMapping("/test-fixture/tenant")

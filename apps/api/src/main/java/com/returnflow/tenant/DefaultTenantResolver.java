@@ -1,12 +1,16 @@
 package com.returnflow.tenant;
 
+import java.util.UUID;
+
 import org.springframework.stereotype.Component;
 
 /**
- * Always resolves the single Warehouse tenant bootstrapped at startup by
- * {@link TenantBootstrap}. This is intentionally the only resolution
- * strategy for now — request-based resolution (JWT, headers, domain, API
- * keys) belongs to later phases.
+ * Looks the tenant up by the ID carried in the authenticated principal and
+ * confirms it is still {@link TenantStatus#ACTIVE}. This is the only
+ * resolution strategy in V1 (single shared schema, no per-tenant routing) —
+ * it exists as its own class/interface pair so callers depend on the
+ * {@link TenantResolver} abstraction rather than a concrete repository
+ * lookup, matching the rest of this module's boundary.
  */
 @Component
 class DefaultTenantResolver implements TenantResolver {
@@ -18,9 +22,9 @@ class DefaultTenantResolver implements TenantResolver {
 	}
 
 	@Override
-	public Tenant resolve() {
-		return tenantRepository.findBySlug(TenantDefaults.WAREHOUSE_SLUG)
-				.orElseThrow(() -> new IllegalStateException(
-						"Default tenant '" + TenantDefaults.WAREHOUSE_SLUG + "' not found — bootstrap should have created it."));
+	public Tenant resolve(UUID tenantId) {
+		return tenantRepository.findById(tenantId)
+				.filter(tenant -> tenant.getStatus() == TenantStatus.ACTIVE)
+				.orElseThrow(() -> new TenantNotActiveException(tenantId));
 	}
 }

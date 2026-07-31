@@ -1,14 +1,15 @@
 package com.returnflow.tenant;
 
 /**
- * Values for the single bootstrap tenant created for the Air House pilot.
- * Shared by {@link TenantBootstrap} and {@link DefaultTenantResolver} so the
- * slug isn't duplicated as a magic string in two places.
+ * Values for the single bootstrap tenant created for the Warehouse pilot.
+ * Shared by {@link TenantBootstrap}, {@link DefaultTenantResolver}, and the
+ * {@code user} package's admin bootstrap so the slug isn't duplicated as a
+ * magic string in multiple places.
  */
-final class TenantDefaults {
+public final class TenantDefaults {
 
-	static final String WAREHOUSE_NAME = "Warehouse";
-	static final String WAREHOUSE_SLUG = "warehouse";
+	public static final String WAREHOUSE_NAME = "Warehouse";
+	public static final String WAREHOUSE_SLUG = "warehouse";
 
 	private TenantDefaults() {
 	}
