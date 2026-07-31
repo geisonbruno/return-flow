@@ -8,15 +8,15 @@
 
 ## 1. Product identity
 
-**Product name:** ReturnFlow  
-**Repository name:** `returnflow`  
-**Initial tenant:** Air House  
-**Product type:** Multi-tenant B2B SaaS, initially validated as an internal operational tool  
+**Product name:** ReturnFlow
+**Repository name:** `returnflow`
+**Initial tenant:** Warehouse
+**Product type:** Multi-tenant B2B SaaS, initially validated as an internal operational tool
 **Primary problem:** Replace paper-based product return forms, daily photos, and fragmented WhatsApp explanations with one traceable digital workflow.
 
 ReturnFlow manages the operational flow of a product return from the driver who records it to the warehouse/admin user who reviews and closes it.
 
-The product must be designed for SaaS evolution, but the first version must remain small, inexpensive, and focused on validating the real Air House workflow.
+The product must be designed for SaaS evolution, but the first version must remain small, inexpensive, and focused on validating the real initial warehouse workflow.
 
 ---
 
@@ -50,7 +50,7 @@ Early validation is successful when:
 - drivers can create complete returns without relying on paper;
 - warehouse users can find, review, close, and print returns;
 - the workflow reduces missing information and repeated explanations;
-- Air House can use the product in real daily operations;
+- the initial warehouse operation can use the product in real daily operations;
 - the architecture does not require a rewrite to add a second tenant.
 
 Exact numeric success targets may be defined after the first pilot.
@@ -73,7 +73,7 @@ All implementation decisions must follow these principles.
 10. **Prefer explicit workflows and small modules over generic abstractions.**
 11. **Avoid microservices, event buses, Kubernetes, and unnecessary infrastructure in V1.**
 12. **Keep cloud providers replaceable through clear interfaces and environment configuration.**
-13. **Use the same product code for Air House and future customers; Air House is a tenant, not a custom fork.**
+13. **Use the same product code for the initial Warehouse tenant and future customers; Warehouse is a tenant, not a custom fork.**
 14. **Every user should see only the information and actions required for their role.**
 15. **Development must happen incrementally with small, reviewable commits.**
 16. **Do not build the entire specification in one implementation step.**
@@ -145,9 +145,9 @@ An admin cannot access data from another tenant.
 
 ## 7. Tenant onboarding
 
-### 7.1 Air House pilot
+### 7.1 Initial Warehouse pilot
 
-The first Air House tenant and first admin are created through a controlled bootstrap process during deployment.
+The initial Warehouse tenant and first admin are created through a controlled bootstrap process during deployment.
 
 The first admin then creates:
 
@@ -278,7 +278,7 @@ No API, web action, or mobile action may permanently delete a return in V1.
 
 Reasons are stored as tenant-owned configuration records so they can be customized in a future version.
 
-V1 does not include a reason-management screen. Default reasons are seeded for Air House.
+V1 does not include a reason-management screen. Default reasons are seeded for the initial Warehouse tenant.
 
 | Code | Display label | Meaning |
 |---|---|---|
@@ -451,7 +451,7 @@ Requirements:
 - removing or replacing photos is allowed only while the driver may edit the return;
 - after `IN_REVIEW`, photos are immutable.
 
-Production storage target: Cloudflare R2.  
+Production storage target: Cloudflare R2.
 Local development target: an S3-compatible local service such as MinIO.
 
 Cloud provider access must be behind an application storage interface.
@@ -652,7 +652,7 @@ V1 behavior:
 
 PDF content:
 
-- ReturnFlow/Air House branding;
+- ReturnFlow and tenant branding;
 - return number;
 - status;
 - customer;
@@ -716,7 +716,9 @@ Every tenant-owned record must contain `tenant_id`.
 
 ### 21.1 Tenant context
 
-The tenant is derived from the authenticated user/session.
+For authenticated business requests, the tenant is derived from trusted authentication data associated with the user/session.
+
+During the tenant-foundation phase only, a temporary default resolver may resolve the bootstrapped `Warehouse` tenant. Once authentication exists, protected requests must derive the tenant from the authenticated principal rather than from client input.
 
 The client must never choose or submit a tenant ID for normal business requests.
 
@@ -762,7 +764,7 @@ Recommended fields:
 - `routeId` nullable for admins;
 - `role` (`DRIVER`, `ADMIN`);
 - `fullName`;
-- normalized unique email within tenant or globally according to final login strategy;
+- globally unique normalized email in V1;
 - password hash;
 - active flag;
 - password-change/reset metadata;
@@ -958,6 +960,8 @@ Endpoint design may be refined, but the domain behavior must remain explicit.
 
 V1 uses email and password.
 
+The normalized email address is globally unique in V1 so login requires only email and password. A future tenant-specific login strategy may revisit this decision intentionally, but no client-provided tenant identifier is accepted in V1 authentication requests.
+
 Recommended architecture:
 
 - Spring Security;
@@ -1013,7 +1017,7 @@ Use HTTP conflict responses for concurrent state conflicts.
 
 ## 26. Database
 
-Production: PostgreSQL.  
+Production: PostgreSQL.
 Local development: PostgreSQL through Docker Compose.
 
 Requirements:
@@ -1113,7 +1117,7 @@ docker compose -f infra/docker-compose.yml up -d
 
 # API
 cd apps/api
-.\mvnw.cmd spring-boot:run
+.\mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local
 
 # Web
 cd apps/web
@@ -1375,157 +1379,244 @@ A feature is complete only when:
 
 ---
 
-## 38. Development Instructions
+## 38. Development instructions
 
 When working on ReturnFlow:
 
-1. Read this root file.
-2. Read the nearest application-specific `CLAUDE.md`.
-3. Read `docs/IMPLEMENTATION_PLAN.md`.
-4. Confirm the current phase and task.
-5. Inspect the existing repository before generating files.
-6. Make the smallest coherent change.
+1. Read this root `CLAUDE.md`.
+2. Read the nearest application-specific `CLAUDE.md` for every application that may change.
+3. Read `docs/IMPLEMENTATION_PLAN.md` for roadmap scope and acceptance criteria.
+4. Read the root `progress.md` for the current phase, current task, approved work, known issues, and relevant implementation decisions.
+5. Inspect the repository, `git status`, and the current diff before generating or changing files.
+6. Make the smallest coherent change that satisfies only the requested phase or subphase.
 7. Do not implement future phases early.
-8. Explain important trade-offs briefly.
-9. Run relevant tests/builds.
-10. Report changed files and commands executed.
-11. Stop after the requested phase and wait for review.
-12. Never silently change a product decision in this file.
-13. When a product decision is missing, surface the ambiguity instead of inventing a major rule.
-14. Prefer a working simple implementation over an impressive architecture.
-15. Preserve the monorepo and independent deploy model.
+8. Do not silently change product, architecture, security, or workflow decisions.
+9. Surface material ambiguity before inventing a new rule.
+10. Prefer a working simple implementation over an impressive architecture.
+11. Run the relevant tests, builds, migrations, and smoke checks defined by the current phase.
+12. Report changed files, commands executed, validation results, and important trade-offs.
+13. During implementation, stop for developer review before creating a Git commit.
+14. Preserve the monorepo and independent deploy model.
+15. Do not reformat unrelated files, rewrite entire documents unnecessarily, or introduce line-ending-only changes.
 
 ---
 
----
+## 39. Development workflow
 
-## 38.5 Development Workflow
+This workflow is mandatory for every future implementation, regardless of the AI model, IDE, or coding assistant.
 
-This workflow is mandatory for every future implementation, regardless of the AI model, IDE, or coding assistant being used.
+The workflow has two separate prompts or tasks for each phase:
 
-The goal is to preserve development continuity, maintain small reviewable changes, and ensure project documentation always reflects the current implementation.
+1. **Implementation task** — implement and validate, then stop for review without committing.
+2. **Finalization task** — only after explicit developer approval, update progress, commit, report the result, and stop.
 
-### Session startup
+### 39.1 Document responsibilities
 
-Before starting any implementation:
+Each project document has one responsibility.
+
+#### `CLAUDE.md`
+
+Defines:
+
+- product decisions;
+- business rules;
+- architecture;
+- security boundaries;
+- engineering principles;
+- development workflow.
+
+It must not be used to record:
+
+- current phase status;
+- implementation history;
+- approvals;
+- commit messages;
+- commit hashes.
+
+#### `docs/IMPLEMENTATION_PLAN.md`
+
+Defines:
+
+- roadmap order;
+- phase and subphase boundaries;
+- goals;
+- deliverables;
+- exclusions;
+- acceptance criteria;
+- UX checkpoints.
+
+It must not be used to record:
+
+- current project status;
+- completed work;
+- approvals;
+- implementation history;
+- planned or actual commit messages;
+- commit hashes.
+
+#### `progress.md`
+
+Defines the current implementation state.
+
+It should contain only:
+
+- current phase;
+- current task;
+- review status;
+- concise completed-phase summaries;
+- pending phases;
+- current capabilities;
+- relevant architectural decisions discovered during implementation;
+- unresolved known issues;
+- concise latest validation results when they remain useful.
+
+It must not duplicate Git history or become a permanent command-by-command execution log.
+
+Do not store commit hashes, commit-message catalogs, full terminal transcripts, resolved transient errors, or obsolete review details in `progress.md`.
+
+#### Git
+
+Git is the source of truth for:
+
+- commit history;
+- commit hashes;
+- authorship;
+- timestamps;
+- diffs;
+- previous document versions.
+
+A commit hash may be reported in the coding assistant's final response, but it must not be written back into `progress.md`, `CLAUDE.md`, or `docs/IMPLEMENTATION_PLAN.md`.
+
+### 39.2 Source-of-truth resolution
+
+Use each document for its own domain:
+
+1. Product, business, architecture, and security decisions: `CLAUDE.md`.
+2. Roadmap order, phase scope, exclusions, and acceptance criteria: `docs/IMPLEMENTATION_PLAN.md`.
+3. Current implementation state and unresolved implementation facts: `progress.md`.
+4. Historical code and documentation changes: Git.
+
+An explicit task may narrow the current phase, but it must not silently broaden the phase or contradict `CLAUDE.md`.
+
+When documents conflict:
+
+- do not guess;
+- identify the exact conflict;
+- stop before implementing the conflicting part;
+- ask the developer to choose or approve the correction.
+
+### 39.3 Session startup
+
+Before any implementation or finalization task:
 
 1. Read `CLAUDE.md`.
-2. Read `progress.md`.
-3. Identify the current implementation phase.
-4. Continue only from the latest approved phase.
-5. Never skip unfinished work.
+2. Read the relevant application-specific `CLAUDE.md` files.
+3. Read `docs/IMPLEMENTATION_PLAN.md`.
+4. Read `progress.md`.
+5. Run `git status`.
+6. Inspect existing uncommitted changes before modifying anything.
+7. Confirm the current phase and whether the task is implementation, review correction, or finalization.
+8. Never skip unfinished or unreviewed work.
 
-If `progress.md` does not exist, create it before implementing new features.
+If `progress.md` does not exist, create a concise initial version before implementing product features.
 
----
+### 39.4 Implementation task
 
-### Progress tracking
+During an implementation task:
 
-The repository must always contain a `progress.md` file in the project root.
+1. Implement only one approved phase or subphase.
+2. Keep the repository buildable and testable.
+3. Update `progress.md` with a concise implementation summary, relevant decisions, known issues, and validation results.
+4. Mark the phase as **Pending Review**.
+5. Do not mark the phase as approved.
+6. Do not create a Git commit.
+7. Do not start the next phase.
+8. Do not modify `CLAUDE.md` or `docs/IMPLEMENTATION_PLAN.md` merely to record progress.
+9. Modify product or roadmap documentation only when the task explicitly requests a real product, architecture, workflow, or roadmap correction.
+10. Stop and wait for developer review.
 
-This file is the current development state of the project.
+### 39.5 Developer review
 
-It must contain at least:
+Only the developer may approve a phase.
 
-- Current phase
-- Current task
-- Completed phases
-- Pending phases
-- Current status
-- Important architectural decisions
-- Known issues
-- Chronological implementation history
+A coding assistant may:
 
-Update `progress.md` whenever an implementation phase is completed.
+- summarize the implementation;
+- identify risks;
+- propose corrections;
+- run additional validation;
+- apply requested review fixes.
 
-Never overwrite previous progress entries.
+A coding assistant must not infer approval from successful tests or from its own assessment.
 
-Always append new progress chronologically.
----
+### 39.6 Finalization task
 
-### Documentation
+A finalization task may begin only after explicit developer approval.
 
-Documentation is considered part of the source code.
+During finalization:
 
-Whenever implementation changes the architecture, workflow, business rules, or important technical decisions:
+1. Re-read the current diff and `progress.md`.
+2. Update `progress.md` once, before the commit:
+   - mark the reviewed phase as approved;
+   - move it to the completed-phase summary;
+   - set the next phase as current but not started, when applicable;
+   - remove obsolete pending-review wording;
+   - preserve relevant architectural decisions and unresolved issues;
+   - keep the document concise.
+3. Do not add a commit hash or planned commit message to any Markdown document.
+4. Do not modify `CLAUDE.md` or `docs/IMPLEMENTATION_PLAN.md` unless the finalization task explicitly requests a real correction to those documents.
+5. Run the relevant validation required to ensure the approved working tree is still valid.
+6. Inspect `git diff --name-only` and confirm that every changed file belongs to the approved phase.
+7. If unexpected files or unrelated changes exist, stop and report them instead of committing.
+8. Create one focused Git commit for the approved phase or subphase.
+9. Report the resulting commit hash in the final response only.
+10. Run `git status` and report whether the working tree is clean.
+11. Do not begin the next phase.
 
-- update `CLAUDE.md` if the project specification changed;
-- update `progress.md`;
-- update `README.md` if project setup changes.
+There is no second documentation commit to record the first commit's hash.
 
-Documentation must never become outdated.
+### 39.7 Commit strategy
 
-Whenever an architectural or business decision changes during development, update this document before implementing dependent features.
+The default is one focused commit per approved phase or explicitly defined subphase.
 
----
+Rules:
 
-### Incremental implementation
+- never combine unrelated phases into one commit;
+- never create an additional commit only to store another commit's hash;
+- never maintain a catalog of commit messages inside the implementation plan;
+- do not amend or rewrite approved history unless the developer explicitly requests it;
+- report the commit message and hash in the coding assistant response, while Git remains the permanent record.
 
-Always work in small implementation phases.
+### 39.8 Progress maintenance
 
-Never implement multiple roadmap phases unless explicitly requested.
+`progress.md` represents the current project state, not a permanent execution diary.
 
-Every phase should leave the repository in a working state.
+When maintaining it:
 
-Prefer small reviewable changes over large feature drops.
+- replace outdated current-task and current-validation details;
+- summarize approved phases instead of retaining full implementation transcripts;
+- preserve only decisions that affect future work;
+- keep unresolved issues until they are resolved;
+- remove resolved transient errors when they no longer provide useful context;
+- rely on Git for previous versions and historical detail;
+- keep the file concise enough to read at the start of every development session.
 
----
+### 39.9 Documentation-change boundaries
 
-### Commit strategy
+Documentation is part of the source code, but each document must change only for a relevant reason.
 
-Each approved implementation phase should generate one Git commit.
+Update:
 
-Recommended workflow:
+- `CLAUDE.md` when a product, business, architecture, security, or workflow decision changes;
+- `docs/IMPLEMENTATION_PLAN.md` when roadmap structure, phase scope, exclusions, or acceptance criteria change;
+- `progress.md` when implementation state, review status, relevant implementation decisions, validation, or known issues change;
+- `README.md` when setup, local execution, or contributor-facing usage changes.
 
-Implementation
-
-↓
-
-Developer Review
-
-↓
-
-Approval
-
-↓
-
-Update progress.md
-
-↓
-
-Git Commit
-
-↓
-
-Next Phase
-
-Never combine multiple approved phases into a single commit.
-
----
-
-### Progress quality
-
-The purpose of `progress.md` is not only to record completed work, but also to explain why important implementation decisions were made.
-
-Prefer documenting architectural reasoning over simply listing completed tasks.
-
----
-
-### Source of truth
-
-Before making implementation decisions, consult these files in order:
-
-1. `CLAUDE.md`
-2. `progress.md`
-3. `docs/IMPLEMENTATION_PLAN.md`
-
-If conflicting information exists, `CLAUDE.md` has priority.
-
-If information is missing, ask for clarification instead of inventing new business rules.
+Do not edit root documentation as a side effect of phase finalization.
 
 ---
 
-## 39. Current decision status
+## 40. Current decision status
 
 The following are considered decided for V1:
 
@@ -1537,7 +1628,9 @@ The following are considered decided for V1:
 - PostgreSQL;
 - Cloudflare R2-compatible storage abstraction;
 - multi-tenant shared schema;
+- initial tenant named `Warehouse`;
 - roles `DRIVER` and `ADMIN`;
+- globally unique normalized email for V1 login;
 - one product per return;
 - one route per driver;
 - reasons listed in this file;
@@ -1553,14 +1646,4 @@ The following are considered decided for V1:
 - no VPS required for MVP development;
 - separate builds and deploys from one repository.
 
-Any change to these decisions must be intentional and documented.
-
---- 
-
-After a phase has been approved by the developer, update progress.md one final time to:
-
-- mark the review as approved;
-- record the Git commit hash;
-- summarize the completed phase if detailed implementation notes are no longer necessary.
-
-Only then create the Git commit.
+Any change to these decisions must be intentional and documented in the correct source-of-truth file before dependent implementation begins.
