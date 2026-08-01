@@ -2,13 +2,13 @@
 
 ## Current phase
 
-**Phase 3A — Return Domain Model.** Not started.
+**Phase 3B — Driver API.** Not started.
 
-Phase 0 (Monorepo scaffold), Phase 1 (Backend foundation), Phase 2A (Tenant Foundation), Phase 2B (Authentication), and Phase 2C (Administration Foundation) are all **reviewed and approved** by the developer.
+Phase 0 (Monorepo scaffold), Phase 1 (Backend foundation), Phase 2A (Tenant Foundation), Phase 2B (Authentication), Phase 2C (Administration Foundation), and Phase 3A (Return Domain Model) are all **reviewed and approved** by the developer.
 
 ## Current task
 
-None. Phase 3A has not started and will not start until a separate task requests it.
+None. Phase 3B has not started and will not start until a separate task requests it.
 
 ## Review status
 
@@ -17,6 +17,7 @@ None. Phase 3A has not started and will not start until a separate task requests
 - Phase 2A — Tenant Foundation — **approved**.
 - Phase 2B — Authentication — **approved**.
 - Phase 2C — Administration Foundation — **approved**.
+- Phase 3A — Return Domain Model — **approved**.
 
 ## Completed phases
 
@@ -25,10 +26,10 @@ None. Phase 3A has not started and will not start until a separate task requests
 - **Phase 2A — Tenant Foundation** (approved 2026-07-28): `Tenant` entity/migration/repository, an idempotent default-tenant ("Warehouse") bootstrap, and the `Auditable` base class (`createdAt`/`updatedAt`) all future entities extend.
 - **Phase 2B — Authentication** (approved 2026-07-31): full email/password authentication — see Current capabilities and Architectural decisions below. Validation: `mvnw test` **62/62 pass**, `mvnw package` **BUILD SUCCESS**.
 - **Phase 2C — Administration Foundation** (approved 2026-07-31): tenant-owned route administration and full user administration — see Current capabilities and Architectural decisions below. Validation: `mvnw test` **98/98 pass**, `mvnw package` **BUILD SUCCESS**.
+- **Phase 3A — Return Domain Model** (approved 2026-08-01): tenant-owned `return_record` domain and persistence foundation — see Current capabilities and Architectural decisions below. Validation: `mvnw test` **120/120 pass**, `mvnw package` **BUILD SUCCESS**.
 
 ## Pending phases
 
-- Phase 3A — Return domain model
 - Phase 3B — Driver API
 - Phase 4 — Mobile driver workflow
 - Phase 5 — Photos and customer signature
@@ -40,7 +41,7 @@ None. Phase 3A has not started and will not start until a separate task requests
 
 ## Current capabilities
 
-- **`apps/api`**: Spring Boot 4.1.0 / Java 21. `mvnw test` (98/98, Testcontainers-backed) and `mvnw package` pass. PostgreSQL + Flyway + Hibernate-validate + `ProblemDetail` error handling + OpenAPI + Actuator. Tenant-owned `app_user` table (`DRIVER`/`ADMIN`, BCrypt-hashed passwords, globally-unique normalized email) with an idempotent, fail-fast first-admin bootstrap from `BOOTSTRAP_ADMIN_*`. Rotating refresh tokens stored only as SHA-256 hashes; short-lived HS256 JWT access tokens. `POST /api/v1/auth/{login,refresh,logout}` and `GET /api/v1/auth/me`. Every protected request derives `TenantContext` from the authenticated principal. Tenant-owned, tenant-unique-coded `route` table. ADMIN-only `/api/v1/admin/routes` (create/list/get/update, no delete) and `/api/v1/admin/users` (create/list/get/update/reset-password, no delete), enforcing one active route per active DRIVER, no route for ADMIN, and self-protection against an admin deactivating or demoting themselves. No return domain yet, by design.
+- **`apps/api`**: Spring Boot 4.1.0 / Java 21. `mvnw test` (120/120, Testcontainers-backed) and `mvnw package` pass. PostgreSQL + Flyway + Hibernate-validate + `ProblemDetail` error handling + OpenAPI + Actuator. Tenant-owned `app_user` table (`DRIVER`/`ADMIN`, BCrypt-hashed passwords, globally-unique normalized email) with an idempotent, fail-fast first-admin bootstrap from `BOOTSTRAP_ADMIN_*`. Rotating refresh tokens stored only as SHA-256 hashes; short-lived HS256 JWT access tokens. `POST /api/v1/auth/{login,refresh,logout}` and `GET /api/v1/auth/me`. Every protected request derives `TenantContext` from the authenticated principal. Tenant-owned, tenant-unique-coded `route` table. ADMIN-only `/api/v1/admin/routes` (create/list/get/update, no delete) and `/api/v1/admin/users` (create/list/get/update/reset-password, no delete), enforcing one active route per active DRIVER, no route for ADMIN, and self-protection against an admin deactivating or demoting themselves. Tenant-owned `return_record` domain and persistence foundation (`returnrecord.ReturnRecord`/`ReturnRecordCreator`/`ReturnRecordRepository`, a database-sequence-backed `RF-000001`-style return-number generator) enforcing the active-DRIVER-with-active-route creation rules and snapshotting the route used at creation time — domain/persistence only, no HTTP endpoint or client yet, by design.
 - **`apps/web`**: Vite + React 19 + TypeScript (strict). `lint`, `typecheck`, `build`, `test` all pass.
 - **`apps/mobile`**: Expo SDK 57 + TypeScript (strict). `typecheck` and `test` pass. `lint`/`expo start` blocked by a local Node version gate — see Known issues.
 - **`infra/docker-compose.yml`**: Postgres 16 (default host port `5433`, overridable via `POSTGRES_PORT` — a native Windows Postgres install on the dev machine already occupies `5432`) + MinIO, both verified healthy.
@@ -87,8 +88,20 @@ None. Phase 3A has not started and will not start until a separate task requests
 - The `/admin/users` response DTO field is `name` (matching this phase's explicit request/response spec), while `/auth/me` (Phase 2B) already shipped as `fullName` — a deliberate, minor inconsistency left as-is rather than retroactively renaming an already-approved contract; both map to the same `User.fullName` internally. Worth knowing before building a web client against both.
 - `UpdateRouteRequest.active`/`UpdateUserRequest.active` are `@NotNull Boolean`, not primitive `boolean` — found in review: a primitive silently deserializes a missing JSON field to `false`, which would have let an incomplete PUT body deactivate a route or user by accident. The service layer unboxes to a local primitive once, immediately after `@Valid` has already guaranteed non-null, and uses that everywhere else.
 
+**Return domain model (Phase 3A):**
+
+- `returnrecord.ReturnRecord` is the first entity in this codebase to use genuine `@ManyToOne(fetch = LAZY)` JPA associations (to `Tenant`, `User` as driver, `Route`) instead of raw `tenantId`-style UUID columns — a deliberate, explicitly-requested exception to the convention every other entity follows, justified by this being the first entity that references three different aggregate roots at once. The relationships stay strictly unidirectional: none of `Tenant`/`User`/`Route` gained a back-reference collection, and nothing cascades to them. Spring Data's property-path resolution still derives `findByIdAndTenantId(id, tenantId)` correctly against the `tenant` association (resolving to `tenant.id`) with no extra configuration.
+- `ReturnRecord.route` is a snapshot of the driver's route **at creation time**, not a live derivation — set once by `ReturnRecordCreator` and never updated afterward, so a later route reassignment never rewrites an existing return's history. Only a direct `route_id` foreign key is stored; no route-code/name snapshot columns were added, since nothing in the current source-of-truth documents requires displaying a route's historical code/name independent of the live `Route` row.
+- Return numbers (`RF-000001`, ...) come from one global PostgreSQL sequence (`return_number_seq`), read via a plain native `SELECT nextval(...)` through `EntityManager` — not row counts, timestamps, or in-memory counters, all unsafe under concurrent creation. `String.format("RF-%06d", ...)` zero-pads to a minimum of six digits without ever truncating, so formatting keeps working correctly past `RF-999999` by simply growing wider. One global (not per-tenant) sequence is an intentional MVP simplicity trade-off for the single-company pilot, consistent with this phase's explicit scope.
+- `ReturnRecordCreator` is the single place every return-creation rule lives (role/active/route/tenant validation, customer-name/observation normalization, number generation, initial status) specifically so the future driver API (Phase 3B) never has to reimplement them — it takes the caller's already-authenticated `Tenant`/`User` directly and never reads `TenantContext` itself, keeping the domain layer free of any assumption about how the caller authenticated.
+- `ReturnRecord`'s constructor is package-private, callable only from `ReturnRecordCreator` (same package) — an additional safeguard beyond what was strictly asked, ensuring no code outside the `returnrecord` package can construct a return while bypassing its validation rules.
+- No HTTP exception handler was added for the new domain exceptions (`DriverRequiredException`, `InactiveRouteException`, etc.) — this phase has no controller; Phase 3B maps them to `ProblemDetail` responses when the driver API exists to receive them.
+- Testing return-number generation against the exact starting value (`RF-000001`) needs a genuinely pristine `return_number_seq`, which the suite's normal shared/cached Testcontainers context can't guarantee (many test classes reuse one cached container). `ReturnNumberGeneratorFreshDatabaseTest` isolates that one assertion with `@DirtiesContext(classMode = BEFORE_CLASS)`, forcing a fresh context+container before it runs; every other return-number test asserts only relative behavior (increments, uniqueness, format) so it's safe to run in any order against the shared context.
+- `ReturnRecordCreator.create()` explicitly rejects a `null` `reason` (`InvalidReasonException`) before any route/route lookup, normalization, number generation, or persistence — found in review: without this guard, a null reason relied entirely on the database's `NOT NULL` constraint as the only backstop, which prevented bad data but leaked a raw persistence exception instead of a clean domain one, inconsistent with every other invalid-input path. Proven by a test that confirms both no row is persisted and no return number is consumed by the rejected attempt (via a before/after relative comparison, not an absolute sequence value).
+
 ## Known issues
 
 - Expo SDK 57's CLI (`expo lint`, `expo start`) requires Node `>=20.19.4`; local dev machine runs Node `20.18.0`. Plain `tsc`/`jest` are unaffected. CI (`mobile.yml`) runs Node 22 and is unaffected. Needs a local Node upgrade, not a code change.
 - `apps/web`'s pinned toolchain versions (see Architectural decisions) exist for the same underlying Node-version gap; revisit once the local/CI Node baseline moves to `>=20.19`.
 - `npm audit` on `apps/mobile` reports moderate/high advisories (`uuid`, `brace-expansion`) — transitive dependencies of Expo's/Jest's own tooling, not fixable without forcing breaking downgrades.
+- `AccessTokenServiceTest.tamperedTokenFailsValidation` (Phase 2B, unrelated to Phase 3A) is occasionally flaky: it tampers a token by flipping only its last base64url character, but a JWT signature's final encoded character carries only a couple of significant bits, so for a small fraction of randomly-generated principal UUIDs the flip doesn't actually change the decoded signature bytes and validation still (correctly) fails for other reasons, but the specific assertion can pass or fail depending on that byte. Confirmed via a clean isolated re-run. Not touched in this session — pre-existing, outside Phase 3A's scope.
