@@ -18,10 +18,12 @@ import com.returnflow.tenant.TenantResolver;
  * — a client can't have a token yet to prove who it is) and the health/
  * OpenAPI endpoints already public before this phase. {@code /auth/me} only
  * needs "any authenticated user". Since Phase 2C, {@code /api/v1/admin/**}
- * additionally requires the {@code ADMIN} role — {@code JwtAuthenticationFilter}
- * already grants {@code ROLE_<role>} from the validated token, so
- * {@code hasRole("ADMIN")} needs no further wiring. Everything else under
- * {@code /api/v1/**} (and anything else) just requires a valid access token.
+ * additionally requires the {@code ADMIN} role, and since Phase 3B
+ * {@code /api/v1/driver/**} requires the {@code DRIVER} role —
+ * {@code JwtAuthenticationFilter} already grants {@code ROLE_<role>} from
+ * the validated token, so {@code hasRole(...)} needs no further wiring.
+ * Everything else under {@code /api/v1/**} (and anything else) just
+ * requires a valid access token.
  */
 @Configuration(proxyBeanMethods = false)
 class SecurityConfig {
@@ -54,6 +56,7 @@ class SecurityConfig {
 								"/swagger-ui.html")
 						.permitAll()
 						.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+						.requestMatchers("/api/v1/driver/**").hasRole("DRIVER")
 						.anyRequest().authenticated())
 				.exceptionHandling(exceptionHandling -> exceptionHandling
 						.authenticationEntryPoint(authenticationEntryPoint)

@@ -13,18 +13,18 @@ import com.returnflow.user.User;
 import com.returnflow.user.UserRole;
 
 /**
- * The single place every return-creation rule lives, so the future driver
- * API (Phase 3B) never has to re-implement them. Deliberately takes the
+ * The single place every return-creation rule lives, so the driver API
+ * (Phase 3B) never has to re-implement them. Deliberately takes the
  * caller's already-authenticated {@link Tenant}/{@link User} directly
  * (never a raw ID, never {@code TenantContext}) — this class has no opinion
- * about how the caller established who's asking; that's the future API
- * layer's job.
+ * about how the caller established who's asking; that's the API layer's job.
  */
 @Service
 class ReturnRecordCreator {
 
 	private static final int CUSTOMER_NAME_MAX_LENGTH = 200;
 	private static final int OBSERVATION_MAX_LENGTH = 2000;
+	private static final int REASON_DETAILS_MAX_LENGTH = 500;
 
 	private final ReturnRecordRepository returnRecordRepository;
 	private final RouteRepository routeRepository;
@@ -37,19 +37,61 @@ class ReturnRecordCreator {
 		this.returnNumberGenerator = returnNumberGenerator;
 	}
 
+	/**
+	 * Groups every driver-supplied field of a new return so
+	 * {@link #create(Tenant, User, NewReturn)} doesn't need an unwieldy
+	 * parameter list. Deliberately not the HTTP request DTO itself, so this
+	 * service stays decoupled from any particular API contract.
+	 */
+	record NewReturn(String customerName, ReturnReason reason, String reasonDetails, Integer quantity,
+			ReturnUnit unit, String observation) {
+	}
+
 	@Transactional
-	ReturnRecord create(Tenant tenant, User driver, String customerName, ReturnReason reason, String observation) {
-		if (reason == null) {
+	ReturnRecord create(Tenant tenant, User driver, NewReturn newReturn) {
+		if (newReturn.reason() == null) {
 			throw new InvalidReasonException();
 		}
+		String normalizedReasonDetails = validateReasonDetails(newReturn.reason(), newReturn.reasonDetails());
+		validateQuantity(newReturn.quantity());
+		if (newReturn.unit() == null) {
+			throw new InvalidUnitException();
+		}
 		Route route = validateDriverAndResolveRoute(tenant, driver);
-		String normalizedCustomerName = normalize(customerName, CUSTOMER_NAME_MAX_LENGTH, InvalidCustomerNameException::new);
-		String normalizedObservation = normalize(observation, OBSERVATION_MAX_LENGTH, InvalidObservationException::new);
+		String normalizedCustomerName = normalize(newReturn.customerName(), CUSTOMER_NAME_MAX_LENGTH, InvalidCustomerNameException::new);
+		String normalizedObservation = normalize(newReturn.observation(), OBSERVATION_MAX_LENGTH, InvalidObservationException::new);
 
 		String returnNumber = returnNumberGenerator.next();
-		ReturnRecord returnRecord = new ReturnRecord(tenant, returnNumber, driver, route, normalizedCustomerName, reason,
+		ReturnRecord returnRecord = new ReturnRecord(tenant, returnNumber, driver, route, normalizedCustomerName,
+				newReturn.reason(), normalizedReasonDetails, newReturn.quantity(), newReturn.unit(),
 				normalizedObservation, ReturnStatus.AWAITING_WAREHOUSE);
 		return returnRecordRepository.save(returnRecord);
+	}
+
+	/**
+	 * {@code OTHER} requires nonblank details (root CLAUDE.md §10.1); every
+	 * other reason must not carry details at all, so the API contract stays
+	 * unambiguous about which field actually drove the return.
+	 */
+	private static String validateReasonDetails(ReturnReason reason, String reasonDetails) {
+		String trimmed = reasonDetails == null ? null : reasonDetails.trim();
+		boolean provided = trimmed != null && !trimmed.isEmpty();
+		if (reason == ReturnReason.OTHER) {
+			if (!provided || trimmed.length() > REASON_DETAILS_MAX_LENGTH) {
+				throw new InvalidReasonDetailsException();
+			}
+			return trimmed;
+		}
+		if (provided) {
+			throw new InvalidReasonDetailsException();
+		}
+		return null;
+	}
+
+	private static void validateQuantity(Integer quantity) {
+		if (quantity == null || quantity <= 0) {
+			throw new InvalidQuantityException();
+		}
 	}
 
 	/**

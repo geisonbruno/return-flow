@@ -59,8 +59,8 @@ class ReturnRecordCreatorIntegrationTest {
 
 	@Test
 	void activeDriverWithAnActiveRouteCreatesAReturn() {
-		ReturnRecord returnRecord = returnRecordCreator.create(tenant, activeDriver, "  Market ABC  ",
-				ReturnReason.DAMAGED_PRODUCT, "  The box was already open  ");
+		ReturnRecord returnRecord = returnRecordCreator.create(tenant, activeDriver,
+				newReturn("  Market ABC  ", ReturnReason.DAMAGED, null, 3, ReturnUnit.EA, "  The box was already open  "));
 
 		assertThat(returnRecord.getId()).isNotNull();
 		assertThat(returnRecord.getTenant().getId()).isEqualTo(tenant.getId());
@@ -68,11 +68,23 @@ class ReturnRecordCreatorIntegrationTest {
 		assertThat(returnRecord.getRoute().getId()).isEqualTo(activeRoute.getId());
 		assertThat(returnRecord.getCustomerName()).isEqualTo("Market ABC");
 		assertThat(returnRecord.getObservation()).isEqualTo("The box was already open");
-		assertThat(returnRecord.getReason()).isEqualTo(ReturnReason.DAMAGED_PRODUCT);
+		assertThat(returnRecord.getReason()).isEqualTo(ReturnReason.DAMAGED);
+		assertThat(returnRecord.getReasonDetails()).isNull();
+		assertThat(returnRecord.getQuantity()).isEqualTo(3);
+		assertThat(returnRecord.getUnit()).isEqualTo(ReturnUnit.EA);
 		assertThat(returnRecord.getStatus()).isEqualTo(ReturnStatus.AWAITING_WAREHOUSE);
 		assertThat(returnRecord.getReturnNumber()).matches("RF-\\d{6,}");
 		assertThat(returnRecord.getCreatedAt()).isNotNull();
 		assertThat(returnRecord.getUpdatedAt()).isNotNull();
+	}
+
+	@Test
+	void anOtherReasonWithDetailsIsAccepted() {
+		ReturnRecord returnRecord = returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "  Customer changed their mind after delivery  ", 1, ReturnUnit.CTN, "Observation"));
+
+		assertThat(returnRecord.getReason()).isEqualTo(ReturnReason.OTHER);
+		assertThat(returnRecord.getReasonDetails()).isEqualTo("Customer changed their mind after delivery");
 	}
 
 	// --- Business-rule rejection ---
@@ -82,7 +94,7 @@ class ReturnRecordCreatorIntegrationTest {
 		String email = uniqueEmail();
 		User admin = userRepository.save(new User(tenant.getId(), UserRole.ADMIN, "Admin", email, email, PASSWORD_HASH, true));
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, admin, "Customer", ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, admin, defaultOtherReasonNewReturn()))
 				.isInstanceOf(DriverRequiredException.class);
 	}
 
@@ -90,7 +102,7 @@ class ReturnRecordCreatorIntegrationTest {
 	void anInactiveDriverIsRejected() {
 		User inactiveDriver = saveDriver(tenant.getId(), false, activeRoute.getId());
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, inactiveDriver, "Customer", ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, inactiveDriver, defaultOtherReasonNewReturn()))
 				.isInstanceOf(InactiveDriverException.class);
 	}
 
@@ -98,7 +110,7 @@ class ReturnRecordCreatorIntegrationTest {
 	void aDriverWithoutARouteIsRejected() {
 		User driverWithoutRoute = saveDriver(tenant.getId(), true, null);
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, driverWithoutRoute, "Customer", ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, driverWithoutRoute, defaultOtherReasonNewReturn()))
 				.isInstanceOf(DriverWithoutRouteException.class);
 	}
 
@@ -107,7 +119,7 @@ class ReturnRecordCreatorIntegrationTest {
 		Route inactiveRoute = routeRepository.save(new Route(tenant.getId(), "INACT", "Inactive", false));
 		User driverOnInactiveRoute = saveDriver(tenant.getId(), true, inactiveRoute.getId());
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, driverOnInactiveRoute, "Customer", ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, driverOnInactiveRoute, defaultOtherReasonNewReturn()))
 				.isInstanceOf(InactiveRouteException.class);
 	}
 
@@ -117,7 +129,7 @@ class ReturnRecordCreatorIntegrationTest {
 		Route otherRoute = routeRepository.save(new Route(otherTenant.getId(), "OR", "Other Route", true));
 		User otherTenantDriver = saveDriver(otherTenant.getId(), true, otherRoute.getId());
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, otherTenantDriver, "Customer", ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, otherTenantDriver, defaultOtherReasonNewReturn()))
 				.isInstanceOf(DriverTenantMismatchException.class);
 	}
 
@@ -131,13 +143,14 @@ class ReturnRecordCreatorIntegrationTest {
 		Route otherTenantsRoute = routeRepository.save(new Route(otherTenant.getId(), "OR2", "Other Route", true));
 		User driverWithCrossTenantRoute = saveDriver(tenant.getId(), true, otherTenantsRoute.getId());
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, driverWithCrossTenantRoute, "Customer", ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, driverWithCrossTenantRoute, defaultOtherReasonNewReturn()))
 				.isInstanceOf(RouteTenantMismatchException.class);
 	}
 
 	@Test
 	void aBlankCustomerNameIsRejected() {
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver, "   ", ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("   ", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidCustomerNameException.class);
 	}
 
@@ -145,13 +158,15 @@ class ReturnRecordCreatorIntegrationTest {
 	void aTooLongCustomerNameIsRejected() {
 		String tooLong = "A".repeat(201);
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver, tooLong, ReturnReason.OTHER, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn(tooLong, ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidCustomerNameException.class);
 	}
 
 	@Test
 	void aBlankObservationIsRejected() {
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver, "Customer", ReturnReason.OTHER, "   "))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "   ")))
 				.isInstanceOf(InvalidObservationException.class);
 	}
 
@@ -159,7 +174,8 @@ class ReturnRecordCreatorIntegrationTest {
 	void aTooLongObservationIsRejected() {
 		String tooLong = "A".repeat(2001);
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver, "Customer", ReturnReason.OTHER, tooLong))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, tooLong)))
 				.isInstanceOf(InvalidObservationException.class);
 	}
 
@@ -168,7 +184,8 @@ class ReturnRecordCreatorIntegrationTest {
 		long countBefore = returnRecordRepository.count();
 		long numberBefore = numericSuffix(returnNumberGenerator.next());
 
-		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver, "Customer", null, "Observation"))
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", null, null, 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidReasonException.class);
 
 		assertThat(returnRecordRepository.count()).isEqualTo(countBefore);
@@ -181,11 +198,66 @@ class ReturnRecordCreatorIntegrationTest {
 		assertThat(numberAfter).isEqualTo(numberBefore + 1);
 	}
 
+	// --- Quantity/unit ---
+
+	@Test
+	void aNullQuantityIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "Details", null, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidQuantityException.class);
+	}
+
+	@Test
+	void aZeroQuantityIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "Details", 0, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidQuantityException.class);
+	}
+
+	@Test
+	void aNegativeQuantityIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "Details", -1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidQuantityException.class);
+	}
+
+	@Test
+	void aNullUnitIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "Details", 1, null, "Observation")))
+				.isInstanceOf(InvalidUnitException.class);
+	}
+
+	// --- OTHER reason details ---
+
+	@Test
+	void otherReasonWithoutDetailsIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, "   ", 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidReasonDetailsException.class);
+	}
+
+	@Test
+	void otherReasonWithTooLongDetailsIsRejected() {
+		String tooLong = "A".repeat(501);
+
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.OTHER, tooLong, 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidReasonDetailsException.class);
+	}
+
+	@Test
+	void detailsProvidedForANonOtherReasonAreRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", ReturnReason.DAMAGED, "Unwanted details", 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidReasonDetailsException.class);
+	}
+
 	// --- Historical route behavior ---
 
 	@Test
 	void theReturnKeepsReferencingTheRouteActiveAtCreationTimeAfterTheDriverIsReassigned() {
-		ReturnRecord created = returnRecordCreator.create(tenant, activeDriver, "Customer", ReturnReason.OTHER, "Observation");
+		ReturnRecord created = returnRecordCreator.create(tenant, activeDriver, defaultOtherReasonNewReturn());
 
 		Route newRoute = routeRepository.save(new Route(tenant.getId(), "R2", "Route Two", true));
 		User reassigned = userRepository.findById(activeDriver.getId()).orElseThrow();
@@ -201,7 +273,7 @@ class ReturnRecordCreatorIntegrationTest {
 
 	@Test
 	void tenantScopedIdLookupCannotRetrieveAnotherTenantsReturn() {
-		ReturnRecord created = returnRecordCreator.create(tenant, activeDriver, "Customer", ReturnReason.OTHER, "Observation");
+		ReturnRecord created = returnRecordCreator.create(tenant, activeDriver, defaultOtherReasonNewReturn());
 		Tenant otherTenant = tenantRepository.save(new Tenant("Other", "return-record-iso-" + UUID.randomUUID(), TenantStatus.ACTIVE));
 
 		assertThat(returnRecordRepository.findByIdAndTenantId(created.getId(), otherTenant.getId())).isEmpty();
@@ -210,7 +282,7 @@ class ReturnRecordCreatorIntegrationTest {
 
 	@Test
 	void tenantScopedReturnNumberLookupCannotRetrieveAnotherTenantsReturn() {
-		ReturnRecord created = returnRecordCreator.create(tenant, activeDriver, "Customer", ReturnReason.OTHER, "Observation");
+		ReturnRecord created = returnRecordCreator.create(tenant, activeDriver, defaultOtherReasonNewReturn());
 		Tenant otherTenant = tenantRepository.save(new Tenant("Other", "return-record-iso2-" + UUID.randomUUID(), TenantStatus.ACTIVE));
 
 		assertThat(returnRecordRepository.findByReturnNumberAndTenantId(created.getReturnNumber(), otherTenant.getId())).isEmpty();
@@ -226,6 +298,15 @@ class ReturnRecordCreatorIntegrationTest {
 
 	private String uniqueEmail() {
 		return "user-" + UUID.randomUUID() + "@warehouse.example";
+	}
+
+	private static ReturnRecordCreator.NewReturn defaultOtherReasonNewReturn() {
+		return newReturn("Customer", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation");
+	}
+
+	private static ReturnRecordCreator.NewReturn newReturn(String customerName, ReturnReason reason, String reasonDetails,
+			Integer quantity, ReturnUnit unit, String observation) {
+		return new ReturnRecordCreator.NewReturn(customerName, reason, reasonDetails, quantity, unit, observation);
 	}
 
 	private static long numericSuffix(String returnNumber) {

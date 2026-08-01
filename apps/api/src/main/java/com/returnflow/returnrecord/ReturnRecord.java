@@ -36,6 +36,10 @@ import com.returnflow.user.User;
  * live derivation from the driver's current assignment — seeded once by
  * {@link ReturnRecordCreator} and never updated afterward, so a later route
  * reassignment never rewrites history (see that class's Javadoc).
+ *
+ * <p>{@code quantity}, {@code unit}, and {@code reasonDetails} are set once
+ * at creation and, like every other field here, have no mutator — this
+ * phase implements no update/edit endpoint.
  */
 @Entity
 @Table(name = "return_record")
@@ -67,6 +71,21 @@ public class ReturnRecord extends Auditable {
 	@Column(nullable = false, length = 30)
 	private ReturnReason reason;
 
+	// Column name intentionally differs from the Java/API property name: V8
+	// already created "other_reason_details" and this correction phase was
+	// explicitly told not to add a migration merely to rename it. The
+	// physical name is an internal implementation detail; "reasonDetails" is
+	// the public/API-facing name (root CLAUDE.md §10.1).
+	@Column(name = "other_reason_details", length = 500)
+	private String reasonDetails;
+
+	@Column(nullable = false)
+	private int quantity;
+
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 10)
+	private ReturnUnit unit;
+
 	@Column(nullable = false, length = 2000)
 	private String observation;
 
@@ -79,13 +98,16 @@ public class ReturnRecord extends Auditable {
 	}
 
 	ReturnRecord(Tenant tenant, String returnNumber, User driver, Route route, String customerName, ReturnReason reason,
-			String observation, ReturnStatus status) {
+			String reasonDetails, int quantity, ReturnUnit unit, String observation, ReturnStatus status) {
 		this.tenant = tenant;
 		this.returnNumber = returnNumber;
 		this.driver = driver;
 		this.route = route;
 		this.customerName = customerName;
 		this.reason = reason;
+		this.reasonDetails = reasonDetails;
+		this.quantity = quantity;
+		this.unit = unit;
 		this.observation = observation;
 		this.status = status;
 	}
@@ -116,6 +138,18 @@ public class ReturnRecord extends Auditable {
 
 	public ReturnReason getReason() {
 		return reason;
+	}
+
+	public String getReasonDetails() {
+		return reasonDetails;
+	}
+
+	public int getQuantity() {
+		return quantity;
+	}
+
+	public ReturnUnit getUnit() {
+		return unit;
 	}
 
 	public String getObservation() {
