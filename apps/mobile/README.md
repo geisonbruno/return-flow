@@ -27,6 +27,18 @@ Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE_URL` to point at the
 7. **Confirm it appears in My Returns**: after creating a return you're taken straight to its details; going back returns to My Returns, where the new return should already be listed (newest first).
 8. **Open Return Details** on any return in the list to see its full read-only record.
 
+## Local web testing (development only)
+
+For quick UX iteration you can also run the app in a browser instead of Expo Go — useful for local testing, not a supported production target.
+
+1. Run the backend on port 8080 **with the `local` Spring profile active** (see `apps/api`), and use `EXPO_PUBLIC_API_BASE_URL=http://localhost:8080` in `.env` (both the browser and the API are on the same computer, so `localhost` works here — this is the one case in this README where it does).
+2. Start the web build: `npx expo start --web -c` (the `-c` clears the Metro cache, useful after dependency changes).
+3. The Expo development server runs on port **8081** (serves the frontend); the ReturnFlow API runs separately on port **8080**. Don't confuse the two — different ports means different browser origins, so a normal browser request between them requires CORS.
+
+The `local` profile allows exactly the browser origin `http://localhost:8081` to call the API (see `auth.security.SecurityConfig`'s `app.cors.local-origin` property) — this is a narrow, explicit, local-development-only allowance, not a production CORS policy, and it is not active in any other profile. Native iOS/Android requests never go through a browser and never need CORS at all.
+
+Expo SecureStore has no browser implementation, so the web build automatically uses `src/auth/tokenStorage.web.ts` (plain browser `localStorage`) instead of `src/auth/tokenStorage.ts` (Expo SecureStore) — this swap is automatic via React Native Web's platform-specific file resolution, no manual step needed. **`localStorage` is a development/testing fallback only, not equivalent security to native SecureStore** — native iOS/Android builds are unaffected and always use SecureStore.
+
 ## Scope
 
 This phase (Phase 4) covers login, session restoration, viewing your own returns, creating a return, viewing return details, and logout — the non-media driver workflow. Photos and customer signatures are out of scope until Phase 5.

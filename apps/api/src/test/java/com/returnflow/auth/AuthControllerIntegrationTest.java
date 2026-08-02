@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -275,6 +276,19 @@ class AuthControllerIntegrationTest {
 		String rawRefreshToken = refreshTokenService.issue(inactive.getId()).rawToken();
 
 		refresh(rawRefreshToken, status().isUnauthorized());
+	}
+
+	// --- CORS profile isolation ---
+
+	@Test
+	void corsIsNotEnabledWithoutTheLocalProfileEvenFromTheKnownLocalOrigin() throws Exception {
+		// The app.cors.local-origin allowance (see auth.security.SecurityConfig)
+		// only exists while the "local" Spring profile is active; this test
+		// class runs with no active profile (this project's normal test
+		// default), so even the exact origin "local" would allow must not
+		// receive an Access-Control-Allow-Origin header here.
+		mockMvc.perform(get("/api/v1/auth/me").header(HttpHeaders.ORIGIN, "http://localhost:8081"))
+				.andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
 	}
 
 	// --- Logout ---

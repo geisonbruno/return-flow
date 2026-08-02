@@ -17,3 +17,14 @@ export interface AuthenticatedUser {
   tenantId: string;
   tenantName: string;
 }
+
+/**
+ * The two values persisted between the native (`tokenStorage.ts`, Expo
+ * SecureStore) and web (`tokenStorage.web.ts`, localStorage) platform
+ * implementations — kept here so both share one contract instead of two
+ * independently-declared, driftable copies.
+ */
+export interface StoredTokens {
+  accessToken: string;
+  refreshToken: string;
+}
