@@ -16,6 +16,7 @@ import com.returnflow.returnrecord.ReturnUnit;
  */
 public record CreateReturnRequest(
 		@NotBlank @Size(max = 200) String customerName,
+		@NotBlank @Size(max = 200) String productName,
 		@NotNull ReturnReason reason,
 		@Size(max = 500) String reasonDetails,
 		@NotNull @Positive Integer quantity,

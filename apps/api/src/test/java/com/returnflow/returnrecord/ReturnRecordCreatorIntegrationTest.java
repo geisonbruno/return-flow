@@ -60,13 +60,14 @@ class ReturnRecordCreatorIntegrationTest {
 	@Test
 	void activeDriverWithAnActiveRouteCreatesAReturn() {
 		ReturnRecord returnRecord = returnRecordCreator.create(tenant, activeDriver,
-				newReturn("  Market ABC  ", ReturnReason.DAMAGED, null, 3, ReturnUnit.EA, "  The box was already open  "));
+				newReturn("  Market ABC  ", "  Product ABC  ", ReturnReason.DAMAGED, null, 3, ReturnUnit.EA, "  The box was already open  "));
 
 		assertThat(returnRecord.getId()).isNotNull();
 		assertThat(returnRecord.getTenant().getId()).isEqualTo(tenant.getId());
 		assertThat(returnRecord.getDriver().getId()).isEqualTo(activeDriver.getId());
 		assertThat(returnRecord.getRoute().getId()).isEqualTo(activeRoute.getId());
 		assertThat(returnRecord.getCustomerName()).isEqualTo("Market ABC");
+		assertThat(returnRecord.getProductName()).isEqualTo("Product ABC");
 		assertThat(returnRecord.getObservation()).isEqualTo("The box was already open");
 		assertThat(returnRecord.getReason()).isEqualTo(ReturnReason.DAMAGED);
 		assertThat(returnRecord.getReasonDetails()).isNull();
@@ -81,7 +82,7 @@ class ReturnRecordCreatorIntegrationTest {
 	@Test
 	void anOtherReasonWithDetailsIsAccepted() {
 		ReturnRecord returnRecord = returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "  Customer changed their mind after delivery  ", 1, ReturnUnit.CTN, "Observation"));
+				newReturn("Customer", "Product", ReturnReason.OTHER, "  Customer changed their mind after delivery  ", 1, ReturnUnit.CTN, "Observation"));
 
 		assertThat(returnRecord.getReason()).isEqualTo(ReturnReason.OTHER);
 		assertThat(returnRecord.getReasonDetails()).isEqualTo("Customer changed their mind after delivery");
@@ -150,7 +151,7 @@ class ReturnRecordCreatorIntegrationTest {
 	@Test
 	void aBlankCustomerNameIsRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("   ", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
+				newReturn("   ", "Product", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidCustomerNameException.class);
 	}
 
@@ -159,14 +160,60 @@ class ReturnRecordCreatorIntegrationTest {
 		String tooLong = "A".repeat(201);
 
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn(tooLong, ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
+				newReturn(tooLong, "Product", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidCustomerNameException.class);
+	}
+
+	// --- Product name ---
+
+	@Test
+	void aNullProductNameIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", null, ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidProductNameException.class);
+	}
+
+	@Test
+	void aBlankProductNameIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", "", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidProductNameException.class);
+	}
+
+	@Test
+	void aWhitespaceOnlyProductNameIsRejected() {
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", "   ", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidProductNameException.class);
+	}
+
+	@Test
+	void aTooLongProductNameIsRejected() {
+		String tooLong = "A".repeat(201);
+
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", tooLong, ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidProductNameException.class);
+	}
+
+	@Test
+	void anInvalidProductNameIsRejectedBeforeNumberGenerationOrPersistence() {
+		long countBefore = returnRecordRepository.count();
+		long numberBefore = numericSuffix(returnNumberGenerator.next());
+
+		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
+				newReturn("Customer", "   ", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation")))
+				.isInstanceOf(InvalidProductNameException.class);
+
+		assertThat(returnRecordRepository.count()).isEqualTo(countBefore);
+		long numberAfter = numericSuffix(returnNumberGenerator.next());
+		assertThat(numberAfter).isEqualTo(numberBefore + 1);
 	}
 
 	@Test
 	void aBlankObservationIsRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "   ")))
+				newReturn("Customer", "Product", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "   ")))
 				.isInstanceOf(InvalidObservationException.class);
 	}
 
@@ -175,7 +222,7 @@ class ReturnRecordCreatorIntegrationTest {
 		String tooLong = "A".repeat(2001);
 
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, tooLong)))
+				newReturn("Customer", "Product", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, tooLong)))
 				.isInstanceOf(InvalidObservationException.class);
 	}
 
@@ -185,7 +232,7 @@ class ReturnRecordCreatorIntegrationTest {
 		long numberBefore = numericSuffix(returnNumberGenerator.next());
 
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", null, null, 1, ReturnUnit.EA, "Observation")))
+				newReturn("Customer", "Product", null, null, 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidReasonException.class);
 
 		assertThat(returnRecordRepository.count()).isEqualTo(countBefore);
@@ -203,28 +250,28 @@ class ReturnRecordCreatorIntegrationTest {
 	@Test
 	void aNullQuantityIsRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "Details", null, ReturnUnit.EA, "Observation")))
+				newReturn("Customer", "Product", ReturnReason.OTHER, "Details", null, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidQuantityException.class);
 	}
 
 	@Test
 	void aZeroQuantityIsRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "Details", 0, ReturnUnit.EA, "Observation")))
+				newReturn("Customer", "Product", ReturnReason.OTHER, "Details", 0, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidQuantityException.class);
 	}
 
 	@Test
 	void aNegativeQuantityIsRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "Details", -1, ReturnUnit.EA, "Observation")))
+				newReturn("Customer", "Product", ReturnReason.OTHER, "Details", -1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidQuantityException.class);
 	}
 
 	@Test
 	void aNullUnitIsRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "Details", 1, null, "Observation")))
+				newReturn("Customer", "Product", ReturnReason.OTHER, "Details", 1, null, "Observation")))
 				.isInstanceOf(InvalidUnitException.class);
 	}
 
@@ -233,7 +280,7 @@ class ReturnRecordCreatorIntegrationTest {
 	@Test
 	void otherReasonWithoutDetailsIsRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, "   ", 1, ReturnUnit.EA, "Observation")))
+				newReturn("Customer", "Product", ReturnReason.OTHER, "   ", 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidReasonDetailsException.class);
 	}
 
@@ -242,14 +289,14 @@ class ReturnRecordCreatorIntegrationTest {
 		String tooLong = "A".repeat(501);
 
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.OTHER, tooLong, 1, ReturnUnit.EA, "Observation")))
+				newReturn("Customer", "Product", ReturnReason.OTHER, tooLong, 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidReasonDetailsException.class);
 	}
 
 	@Test
 	void detailsProvidedForANonOtherReasonAreRejected() {
 		assertThatThrownBy(() -> returnRecordCreator.create(tenant, activeDriver,
-				newReturn("Customer", ReturnReason.DAMAGED, "Unwanted details", 1, ReturnUnit.EA, "Observation")))
+				newReturn("Customer", "Product", ReturnReason.DAMAGED, "Unwanted details", 1, ReturnUnit.EA, "Observation")))
 				.isInstanceOf(InvalidReasonDetailsException.class);
 	}
 
@@ -301,12 +348,12 @@ class ReturnRecordCreatorIntegrationTest {
 	}
 
 	private static ReturnRecordCreator.NewReturn defaultOtherReasonNewReturn() {
-		return newReturn("Customer", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation");
+		return newReturn("Customer", "Product ABC", ReturnReason.OTHER, "Details", 1, ReturnUnit.EA, "Observation");
 	}
 
-	private static ReturnRecordCreator.NewReturn newReturn(String customerName, ReturnReason reason, String reasonDetails,
-			Integer quantity, ReturnUnit unit, String observation) {
-		return new ReturnRecordCreator.NewReturn(customerName, reason, reasonDetails, quantity, unit, observation);
+	private static ReturnRecordCreator.NewReturn newReturn(String customerName, String productName, ReturnReason reason,
+			String reasonDetails, Integer quantity, ReturnUnit unit, String observation) {
+		return new ReturnRecordCreator.NewReturn(customerName, productName, reason, reasonDetails, quantity, unit, observation);
 	}
 
 	private static long numericSuffix(String returnNumber) {

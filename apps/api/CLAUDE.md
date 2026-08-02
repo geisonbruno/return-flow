@@ -191,7 +191,7 @@ Closed and cancelled returns are immutable in V1.
 Server-side validation includes:
 
 - customer name not blank;
-- product description not blank;
+- product name (`productName`) not blank, free text, max 200 characters, one product per return, immutable after creation, no product catalog;
 - quantity is a positive integer;
 - unit only `EA` or `CTN`;
 - active reason belongs to the tenant;

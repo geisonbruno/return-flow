@@ -61,6 +61,11 @@ class DriverReturnExceptionHandler {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid Customer Name", "Customer name is required.");
 	}
 
+	@ExceptionHandler(InvalidProductNameException.class)
+	ProblemDetail handleInvalidProductName() {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Product Name", "Product name is required.");
+	}
+
 	@ExceptionHandler(InvalidObservationException.class)
 	ProblemDetail handleInvalidObservation() {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid Observation", "Observation is required.");

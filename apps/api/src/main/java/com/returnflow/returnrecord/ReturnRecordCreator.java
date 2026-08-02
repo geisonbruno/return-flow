@@ -23,6 +23,7 @@ import com.returnflow.user.UserRole;
 class ReturnRecordCreator {
 
 	private static final int CUSTOMER_NAME_MAX_LENGTH = 200;
+	private static final int PRODUCT_NAME_MAX_LENGTH = 200;
 	private static final int OBSERVATION_MAX_LENGTH = 2000;
 	private static final int REASON_DETAILS_MAX_LENGTH = 500;
 
@@ -43,7 +44,7 @@ class ReturnRecordCreator {
 	 * parameter list. Deliberately not the HTTP request DTO itself, so this
 	 * service stays decoupled from any particular API contract.
 	 */
-	record NewReturn(String customerName, ReturnReason reason, String reasonDetails, Integer quantity,
+	record NewReturn(String customerName, String productName, ReturnReason reason, String reasonDetails, Integer quantity,
 			ReturnUnit unit, String observation) {
 	}
 
@@ -59,11 +60,12 @@ class ReturnRecordCreator {
 		}
 		Route route = validateDriverAndResolveRoute(tenant, driver);
 		String normalizedCustomerName = normalize(newReturn.customerName(), CUSTOMER_NAME_MAX_LENGTH, InvalidCustomerNameException::new);
+		String normalizedProductName = normalize(newReturn.productName(), PRODUCT_NAME_MAX_LENGTH, InvalidProductNameException::new);
 		String normalizedObservation = normalize(newReturn.observation(), OBSERVATION_MAX_LENGTH, InvalidObservationException::new);
 
 		String returnNumber = returnNumberGenerator.next();
 		ReturnRecord returnRecord = new ReturnRecord(tenant, returnNumber, driver, route, normalizedCustomerName,
-				newReturn.reason(), normalizedReasonDetails, newReturn.quantity(), newReturn.unit(),
+				normalizedProductName, newReturn.reason(), normalizedReasonDetails, newReturn.quantity(), newReturn.unit(),
 				normalizedObservation, ReturnStatus.AWAITING_WAREHOUSE);
 		return returnRecordRepository.save(returnRecord);
 	}

@@ -121,6 +121,7 @@ class DriverReturnIntegrationTest {
 				.andExpect(jsonPath("$.id").exists())
 				.andExpect(jsonPath("$.returnNumber").value(org.hamcrest.Matchers.matchesPattern("RF-\\d{6,}")))
 				.andExpect(jsonPath("$.customerName").value("Market ABC"))
+				.andExpect(jsonPath("$.productName").value("Widget X200"))
 				.andExpect(jsonPath("$.reason").value("DAMAGED"))
 				.andExpect(jsonPath("$.reasonDetails").doesNotExist())
 				.andExpect(jsonPath("$.otherReasonDetails").doesNotExist())
@@ -210,6 +211,30 @@ class DriverReturnIntegrationTest {
 	void missingCustomerNameIsRejected() throws Exception {
 		Map<String, Object> body = validBody();
 		body.remove("customerName");
+
+		mockMvc.perform(createReturnRequest(body)).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void missingProductNameIsRejected() throws Exception {
+		Map<String, Object> body = validBody();
+		body.remove("productName");
+
+		mockMvc.perform(createReturnRequest(body)).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void blankProductNameIsRejected() throws Exception {
+		Map<String, Object> body = validBody();
+		body.put("productName", "   ");
+
+		mockMvc.perform(createReturnRequest(body)).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void tooLongProductNameIsRejected() throws Exception {
+		Map<String, Object> body = validBody();
+		body.put("productName", "A".repeat(201));
 
 		mockMvc.perform(createReturnRequest(body)).andExpect(status().isBadRequest());
 	}
@@ -398,7 +423,9 @@ class DriverReturnIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.length()").value(2))
 				.andExpect(jsonPath("$[0].id").value(secondId))
-				.andExpect(jsonPath("$[1].id").value(firstId));
+				.andExpect(jsonPath("$[1].id").value(firstId))
+				.andExpect(jsonPath("$[0].productName").value("Widget X200"))
+				.andExpect(jsonPath("$[1].productName").value("Widget X200"));
 	}
 
 	@Test
@@ -417,7 +444,8 @@ class DriverReturnIntegrationTest {
 
 		mockMvc.perform(get("/api/v1/driver/returns/" + id).header(HttpHeaders.AUTHORIZATION, driverToken))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.id").value(id));
+				.andExpect(jsonPath("$.id").value(id))
+				.andExpect(jsonPath("$.productName").value("Widget X200"));
 	}
 
 	@Test
@@ -476,6 +504,7 @@ class DriverReturnIntegrationTest {
 	private static Map<String, Object> validBody() {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("customerName", "Market ABC");
+		body.put("productName", "Widget X200");
 		body.put("reason", "DAMAGED");
 		body.put("quantity", 2);
 		body.put("unit", "EA");

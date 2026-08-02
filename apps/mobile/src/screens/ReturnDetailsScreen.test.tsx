@@ -11,6 +11,7 @@ const RECORD = {
   id: 'return-1',
   returnNumber: 'RF-000042',
   customerName: 'Market ABC',
+  productName: 'Widget X200',
   reason: 'OTHER' as const,
   reasonDetails: 'Customer changed their mind',
   quantity: 3,
@@ -42,6 +43,7 @@ describe('ReturnDetailsScreen', () => {
 
     await waitFor(() => expect(screen.getByText('RF-000042')).toBeTruthy());
     expect(screen.getByText('Market ABC')).toBeTruthy();
+    expect(screen.getByText('Widget X200')).toBeTruthy();
     expect(screen.getByText('Other')).toBeTruthy();
     expect(screen.getByText('Customer changed their mind')).toBeTruthy();
     expect(screen.getByText('3 CTN')).toBeTruthy();

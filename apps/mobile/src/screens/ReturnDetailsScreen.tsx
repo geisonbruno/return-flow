@@ -58,6 +58,7 @@ export default function ReturnDetailsScreen({ route }: Props) {
         <Text style={styles.status}>{STATUS_LABELS[record.status]}</Text>
 
         <DetailRow label="Customer" value={record.customerName} />
+        <DetailRow label="Product" value={record.productName} />
         <DetailRow label="Reason" value={REASON_LABELS[record.reason]} />
         {record.reasonDetails ? <DetailRow label="Reason details" value={record.reasonDetails} /> : null}
         <DetailRow label="Quantity" value={formatQuantityAndUnit(record.quantity, record.unit)} />

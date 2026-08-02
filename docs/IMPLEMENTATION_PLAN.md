@@ -438,6 +438,10 @@ Implement the authenticated non-media driver experience using the approved mobil
 - network failure never reports false success;
 - typecheck and mobile tests pass.
 
+### Phase 4.1 — Product identification correction
+
+Real manual use of the application after Phase 4 showed that a return needs an explicit product identity separate from the free-text observation field, or drivers must conflate the two. Phase 4.1 (tracked in `progress.md`, not a renumbered roadmap entry) adds a required `productName` field — free text, one product per return, immutable after creation, no product catalog, SKU, or barcode — to the driver return API, database, and the mobile New Return form, My Returns list, and Return Details screens described above. It does not change this phase's original acceptance criteria and does not add photos, signatures, editing, or any Phase 5+ capability.
+
 ---
 
 ## 12. Phase 5A — Media and signature backend

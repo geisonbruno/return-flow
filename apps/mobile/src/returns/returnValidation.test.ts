@@ -1,8 +1,15 @@
-import { CUSTOMER_NAME_MAX_LENGTH, OBSERVATION_MAX_LENGTH, REASON_DETAILS_MAX_LENGTH, validateCreateReturnForm } from './returnValidation';
+import {
+  CUSTOMER_NAME_MAX_LENGTH,
+  OBSERVATION_MAX_LENGTH,
+  PRODUCT_NAME_MAX_LENGTH,
+  REASON_DETAILS_MAX_LENGTH,
+  validateCreateReturnForm,
+} from './returnValidation';
 import type { CreateReturnFormValues } from './returnValidation';
 
 const VALID: CreateReturnFormValues = {
   customerName: 'Market ABC',
+  productName: 'Widget X200',
   reason: 'DAMAGED',
   reasonDetails: '',
   quantity: '3',
@@ -17,6 +24,7 @@ describe('validateCreateReturnForm', () => {
     expect(errors).toEqual({});
     expect(payload).toEqual({
       customerName: 'Market ABC',
+      productName: 'Widget X200',
       reason: 'DAMAGED',
       quantity: 3,
       unit: 'CTN',
@@ -25,16 +33,18 @@ describe('validateCreateReturnForm', () => {
     expect(payload).not.toHaveProperty('reasonDetails');
   });
 
-  it('trims customer name, observation, and reason details', () => {
+  it('trims customer name, product name, observation, and reason details', () => {
     const { payload } = validateCreateReturnForm({
       ...VALID,
       customerName: '  Market ABC  ',
+      productName: '  Widget X200  ',
       observation: '  Box was open on arrival  ',
       reason: 'OTHER',
       reasonDetails: '  Customer changed their mind  ',
     });
 
     expect(payload?.customerName).toBe('Market ABC');
+    expect(payload?.productName).toBe('Widget X200');
     expect(payload?.observation).toBe('Box was open on arrival');
     expect(payload?.reasonDetails).toBe('Customer changed their mind');
   });
@@ -48,6 +58,24 @@ describe('validateCreateReturnForm', () => {
   it('rejects a customer name over the backend maximum length', () => {
     const { errors } = validateCreateReturnForm({ ...VALID, customerName: 'A'.repeat(CUSTOMER_NAME_MAX_LENGTH + 1) });
     expect(errors.customerName).toBeDefined();
+  });
+
+  it('requires product name', () => {
+    const { errors, payload } = validateCreateReturnForm({ ...VALID, productName: '   ' });
+    expect(errors.productName).toBeDefined();
+    expect(payload).toBeNull();
+  });
+
+  it('rejects a product name over the backend maximum length', () => {
+    const { errors } = validateCreateReturnForm({ ...VALID, productName: 'A'.repeat(PRODUCT_NAME_MAX_LENGTH + 1) });
+    expect(errors.productName).toBeDefined();
+  });
+
+  it('keeps product name separate from observation in the built payload', () => {
+    const { payload } = validateCreateReturnForm({ ...VALID, productName: 'Widget X200', observation: 'Box was damp' });
+    expect(payload?.productName).toBe('Widget X200');
+    expect(payload?.observation).toBe('Box was damp');
+    expect(payload?.observation).not.toContain('Widget X200');
   });
 
   it('requires a reason', () => {

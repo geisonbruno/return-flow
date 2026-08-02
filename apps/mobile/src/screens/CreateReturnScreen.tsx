@@ -14,6 +14,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CreateReturn'>;
 
 const INITIAL_VALUES: CreateReturnFormValues = {
   customerName: '',
+  productName: '',
   reason: null,
   reasonDetails: '',
   quantity: '',
@@ -75,6 +76,19 @@ export default function CreateReturnScreen({ navigation }: Props) {
               testID="customer-name-input"
             />
             {errors.customerName ? <Text style={styles.fieldError}>{errors.customerName}</Text> : null}
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Product name</Text>
+            <TextInput
+              style={styles.input}
+              value={values.productName}
+              onChangeText={(text) => setValues((prev) => ({ ...prev, productName: text }))}
+              editable={!submitting}
+              accessibilityLabel="Product name"
+              testID="product-name-input"
+            />
+            {errors.productName ? <Text style={styles.fieldError}>{errors.productName}</Text> : null}
           </View>
 
           <View style={styles.field}>

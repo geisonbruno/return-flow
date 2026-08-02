@@ -81,6 +81,7 @@ export default function ReturnListScreen({ navigation }: Props) {
               <Text style={styles.returnNumber}>{item.returnNumber}</Text>
               <Text style={styles.status}>{STATUS_LABELS[item.status]}</Text>
             </View>
+            <Text style={styles.productName}>{item.productName}</Text>
             <Text style={styles.customerName}>{item.customerName}</Text>
             <View style={styles.cardMetaRow}>
               <Text style={styles.meta}>{formatQuantityAndUnit(item.quantity, item.unit)}</Text>
@@ -163,6 +164,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
   },
   customerName: {
     fontSize: 15,

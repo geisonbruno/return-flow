@@ -13,6 +13,7 @@ public record ReturnResponse(
 		UUID id,
 		String returnNumber,
 		String customerName,
+		String productName,
 		ReturnReason reason,
 		String reasonDetails,
 		int quantity,

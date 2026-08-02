@@ -52,26 +52,26 @@ class ReturnRecordRepositoryIntegrationTest {
 
 	@Test
 	void duplicateReturnNumberViolatesTheUniqueConstraint() {
-		returnRecordRepository.save(new ReturnRecord(tenant, "RF-DUPTEST", driver, route, "Customer", ReturnReason.DAMAGED,
+		returnRecordRepository.save(new ReturnRecord(tenant, "RF-DUPTEST", driver, route, "Customer", "Product", ReturnReason.DAMAGED,
 				null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
 
 		assertThatThrownBy(() -> returnRecordRepository.saveAndFlush(new ReturnRecord(tenant, "RF-DUPTEST", driver, route,
-				"Customer 2", ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation 2", ReturnStatus.AWAITING_WAREHOUSE)))
+				"Customer 2", "Product", ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation 2", ReturnStatus.AWAITING_WAREHOUSE)))
 				.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
 	void driverScopedListReturnsOnlyThatDriversReturnsNewestFirst() {
 		ReturnRecord older = returnRecordRepository.save(new ReturnRecord(tenant, "RF-DRV1", driver, route, "Customer",
-				ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
+				"Product", ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
 		ReturnRecord newer = returnRecordRepository.save(new ReturnRecord(tenant, "RF-DRV2", driver, route, "Customer",
-				ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
+				"Product", ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
 
 		String email = "user-" + UUID.randomUUID() + "@warehouse.example";
 		User otherDriver = userRepository.save(new User(tenant.getId(), UserRole.DRIVER, "Other Driver", email, email,
 				"irrelevant-hash", true, route.getId()));
 		returnRecordRepository.save(new ReturnRecord(tenant, "RF-DRV3", otherDriver, route, "Customer",
-				ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
+				"Product", ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
 
 		var results = returnRecordRepository.findByTenantIdAndDriverIdOrderByCreatedAtDescIdDesc(tenant.getId(), driver.getId());
 
@@ -83,7 +83,7 @@ class ReturnRecordRepositoryIntegrationTest {
 	@Test
 	void driverScopedIdLookupCannotRetrieveAnotherDriversReturn() {
 		ReturnRecord created = returnRecordRepository.save(new ReturnRecord(tenant, "RF-OWNER", driver, route, "Customer",
-				ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
+				"Product", ReturnReason.DAMAGED, null, 1, ReturnUnit.EA, "Observation", ReturnStatus.AWAITING_WAREHOUSE));
 
 		String email = "user-" + UUID.randomUUID() + "@warehouse.example";
 		User otherDriver = userRepository.save(new User(tenant.getId(), UserRole.DRIVER, "Other Driver", email, email,

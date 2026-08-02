@@ -37,6 +37,7 @@ export interface ReturnRecord {
   id: string;
   returnNumber: string;
   customerName: string;
+  productName: string;
   reason: ReturnReason;
   reasonDetails: string | null;
   quantity: number;
@@ -50,12 +51,13 @@ export interface ReturnRecord {
 }
 
 /**
- * Matches `returnrecord.dto.CreateReturnRequest` exactly — only these six
+ * Matches `returnrecord.dto.CreateReturnRequest` exactly — only these seven
  * fields are ever sent. No tenantId, driverId, routeId, returnNumber,
  * status, createdAt, or updatedAt: those are always server-derived.
  */
 export interface CreateReturnPayload {
   customerName: string;
+  productName: string;
   reason: ReturnReason;
   reasonDetails?: string;
   quantity: number;

@@ -2,11 +2,13 @@ import type { CreateReturnPayload, ReturnReason, ReturnUnit } from './types';
 
 /** Mirrors `returnrecord.ReturnRecordCreator`'s limits exactly — the backend remains the final source of truth. */
 export const CUSTOMER_NAME_MAX_LENGTH = 200;
+export const PRODUCT_NAME_MAX_LENGTH = 200;
 export const OBSERVATION_MAX_LENGTH = 2000;
 export const REASON_DETAILS_MAX_LENGTH = 500;
 
 export interface CreateReturnFormValues {
   customerName: string;
+  productName: string;
   reason: ReturnReason | null;
   reasonDetails: string;
   /** Raw text from the numeric input — validated and parsed here, never trusted as-is. */
@@ -17,6 +19,7 @@ export interface CreateReturnFormValues {
 
 export interface CreateReturnFormErrors {
   customerName?: string;
+  productName?: string;
   reason?: string;
   reasonDetails?: string;
   quantity?: string;
@@ -40,6 +43,13 @@ export function validateCreateReturnForm(values: CreateReturnFormValues): Create
     errors.customerName = 'Customer name is required.';
   } else if (customerName.length > CUSTOMER_NAME_MAX_LENGTH) {
     errors.customerName = `Customer name must be ${CUSTOMER_NAME_MAX_LENGTH} characters or fewer.`;
+  }
+
+  const productName = values.productName.trim();
+  if (!productName) {
+    errors.productName = 'Product name is required.';
+  } else if (productName.length > PRODUCT_NAME_MAX_LENGTH) {
+    errors.productName = `Product name must be ${PRODUCT_NAME_MAX_LENGTH} characters or fewer.`;
   }
 
   if (!values.reason) {
@@ -87,6 +97,7 @@ export function validateCreateReturnForm(values: CreateReturnFormValues): Create
 
   const payload: CreateReturnPayload = {
     customerName,
+    productName,
     reason: values.reason,
     quantity,
     unit: values.unit,

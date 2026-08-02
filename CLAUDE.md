@@ -339,7 +339,7 @@ The system generates or derives:
 Required unless marked otherwise:
 
 - `customerName` — required text;
-- `productDescription` — required text;
+- `productName` — required text, free text, one product per return;
 - `quantity` — required positive integer;
 - `unit` — required enum: `EA` or `CTN`;
 - `reasonId` — required;
@@ -362,7 +362,7 @@ Quantity must be a positive integer. Decimal quantities, kilograms, packs, and o
 
 There is no product catalog in V1.
 
-The driver enters a free-text product description.
+The driver enters a free-text `productName`. This field is required, immutable after the return is created, and limited to one product per return, consistent with the domain rule in §8.
 
 Future ERP integration may replace or augment this field.
 
@@ -807,7 +807,7 @@ Recommended fields:
 - route ID;
 - route code/name snapshot;
 - customer name;
-- product description;
+- product name;
 - quantity;
 - unit;
 - reason ID;

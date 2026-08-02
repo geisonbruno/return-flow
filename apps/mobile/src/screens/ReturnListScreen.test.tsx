@@ -34,8 +34,16 @@ describe('ReturnListScreen', () => {
 
     render(<ReturnListScreen navigation={navigation as any} route={{} as any} />);
 
-    await waitFor(() => expect(screen.getByText('No returns yet.')).toBeTruthy());
+    // This is the first render in the file, so it pays a one-time
+    // native-mock/module initialization cost (SafeAreaView, FlatList,
+    // RefreshControl) that the later tests below never pay again — that cost
+    // occasionally exceeds testing-library's default 1000ms waitFor window
+    // on a loaded machine even though the screen's loading-to-ready
+    // transition itself is correct and fast. A longer timeout here is the
+    // correct remedy for a slow first mount, not a synchronization bug.
+    await waitFor(() => expect(screen.getByText('No returns yet.')).toBeTruthy(), { timeout: 5000 });
     expect(screen.getByText('Create your first return to get started.')).toBeTruthy();
+    expect(screen.queryByText('Unable to load your returns.')).toBeNull();
   });
 
   it('shows the returned records in the given (newest-first) order without re-sorting them', async () => {
@@ -44,6 +52,7 @@ describe('ReturnListScreen', () => {
         id: '2',
         returnNumber: 'RF-000002',
         customerName: 'Newer Customer',
+        productName: 'Widget X200',
         reason: 'DAMAGED',
         reasonDetails: null,
         quantity: 1,
@@ -59,6 +68,7 @@ describe('ReturnListScreen', () => {
         id: '1',
         returnNumber: 'RF-000001',
         customerName: 'Older Customer',
+        productName: 'Gadget Y300',
         reason: 'OTHER',
         reasonDetails: 'Some detail',
         quantity: 2,
@@ -79,6 +89,9 @@ describe('ReturnListScreen', () => {
     expect(screen.getByText('RF-000001')).toBeTruthy();
     expect(screen.getByText('1 EA')).toBeTruthy();
     expect(screen.getByText('2 CTN')).toBeTruthy();
+    expect(screen.getByText('Widget X200')).toBeTruthy();
+    expect(screen.getByText('Gadget Y300')).toBeTruthy();
+    expect(screen.queryByText('obs')).toBeNull();
   });
 
   it('shows an error state with Retry, and Retry reloads the list', async () => {

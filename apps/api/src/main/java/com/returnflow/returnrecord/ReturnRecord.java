@@ -67,6 +67,9 @@ public class ReturnRecord extends Auditable {
 	@Column(name = "customer_name", nullable = false, length = 200)
 	private String customerName;
 
+	@Column(name = "product_name", nullable = false, length = 200)
+	private String productName;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 30)
 	private ReturnReason reason;
@@ -97,13 +100,14 @@ public class ReturnRecord extends Auditable {
 		// JPA
 	}
 
-	ReturnRecord(Tenant tenant, String returnNumber, User driver, Route route, String customerName, ReturnReason reason,
-			String reasonDetails, int quantity, ReturnUnit unit, String observation, ReturnStatus status) {
+	ReturnRecord(Tenant tenant, String returnNumber, User driver, Route route, String customerName, String productName,
+			ReturnReason reason, String reasonDetails, int quantity, ReturnUnit unit, String observation, ReturnStatus status) {
 		this.tenant = tenant;
 		this.returnNumber = returnNumber;
 		this.driver = driver;
 		this.route = route;
 		this.customerName = customerName;
+		this.productName = productName;
 		this.reason = reason;
 		this.reasonDetails = reasonDetails;
 		this.quantity = quantity;
@@ -134,6 +138,10 @@ public class ReturnRecord extends Auditable {
 
 	public String getCustomerName() {
 		return customerName;
+	}
+
+	public String getProductName() {
+		return productName;
 	}
 
 	public ReturnReason getReason() {

@@ -52,7 +52,8 @@ class DriverReturnService {
 		Tenant tenant = TenantContext.get();
 		User driver = findAuthenticatedDriver(principal, tenant);
 		ReturnRecordCreator.NewReturn newReturn = new ReturnRecordCreator.NewReturn(request.customerName(),
-				request.reason(), request.reasonDetails(), request.quantity(), request.unit(), request.observation());
+				request.productName(), request.reason(), request.reasonDetails(), request.quantity(), request.unit(),
+				request.observation());
 		ReturnRecord created = returnRecordCreator.create(tenant, driver, newReturn);
 		return toResponse(created);
 	}
@@ -92,6 +93,7 @@ class DriverReturnService {
 				returnRecord.getId(),
 				returnRecord.getReturnNumber(),
 				returnRecord.getCustomerName(),
+				returnRecord.getProductName(),
 				returnRecord.getReason(),
 				returnRecord.getReasonDetails(),
 				returnRecord.getQuantity(),
