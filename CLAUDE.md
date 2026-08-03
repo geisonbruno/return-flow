@@ -1589,6 +1589,19 @@ Rules:
 - do not amend or rewrite approved history unless the developer explicitly requests it;
 - report the commit message and hash in the coding assistant response, while Git remains the permanent record.
 
+### 39.7a Branching, Pull Requests, and CI
+
+`main` is the protected default branch. Direct implementation on `main` is prohibited.
+
+- Every task's implementation happens on a dedicated branch created from an up-to-date `main` (see `docs/DEVELOPMENT_WORKFLOW.md` for naming conventions).
+- An implementation task still stops **Pending Review** without creating a commit, exactly as described above — only now that stop happens on the feature branch, not on `main`.
+- A separate, explicit approval prompt creates the commit, on that same feature branch.
+- Pushing the branch, opening a Pull Request, merging, tagging, and deploying each require explicit developer instruction in that specific task — none of them happen automatically after a commit is created.
+- Backend CI and Mobile CI (`.github/workflows/ci.yml`) must pass before a Pull Request merges into `main`. Mobile CI currently runs `npm ci`, tests, typecheck, and lint — all blocking.
+- Expo Doctor is a manual dependency-health check, run during focused maintenance tasks, not a CI step — until it is safely restored to CI, it must not be added back as a permanent warning-only or always-passing check.
+- Dependency-version drift must not be corrected with `--force` or `--legacy-peer-deps` without explicit developer approval for that specific change.
+- `docs/DEVELOPMENT_WORKFLOW.md` is the source of truth for the Git branching, commit, and Pull Request workflow; this section only summarizes it.
+
 ### 39.8 Progress maintenance
 
 `progress.md` represents the current project state, not a permanent execution diary.

@@ -14,7 +14,21 @@ npm run test        # jest (jest-expo preset)
 
 Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE_URL` to point at the local API.
 
-> Requires Node >=20.19.4 (or >=22.12) — the Expo CLI enforces this minimum for `expo start`/`expo lint`.
+> Requires Node >=20.19.4 (or >=22.12) — the Expo CLI enforces this minimum for `expo start`/`expo lint`. This project standardizes on **Node 20.19.4** (see `.nvmrc`, also used by `Mobile CI` in `.github/workflows/ci.yml`) — the lowest version that satisfies Expo SDK 57's requirement, so the local runtime stays on the same Node 20.x line already in use rather than jumping to a newer major. Run `nvm use` if you use nvm. **The local dev machine on this repository currently runs Node 20.18.0 and still needs a manual upgrade to 20.19.4** — that upgrade is outside this repository's files and hasn't been done yet.
+
+## Dependency health (Expo Doctor)
+
+`npx expo-doctor` currently reports **17/18** — one pre-existing dependency-version drift (`expo`, `react-native`, `eslint-config-expo`, `jest-expo` one patch behind the SDK's expected pin, plus `@types/jest` one major ahead). `npx expo install --fix` cannot resolve it automatically: it hits a genuine npm `ERESOLVE` peer-dependency conflict on `@react-native/jest-preset` partway through. This project does not accept `--legacy-peer-deps`/`--force` as a routine fix for that.
+
+Expo Doctor is **not** part of `Mobile CI` right now — a permanently-informational, always-passing CI step was deliberately rejected in favor of keeping CI fully blocking on checks that can pass cleanly. Instead, run `npx expo-doctor` manually:
+
+- before an Expo SDK upgrade;
+- when adding a native dependency;
+- before creating a development or production build;
+- before the first pilot release;
+- during a dedicated, reviewed dependency-maintenance task.
+
+Expo Doctor returns to `Mobile CI` — as a blocking step — only once a focused maintenance task safely gets the project to 18/18. See `PROGRESS.md` Known Issues for the current status.
 
 ## Trying it on a phone (manual walkthrough)
 
