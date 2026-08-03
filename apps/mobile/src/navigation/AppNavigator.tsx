@@ -4,6 +4,7 @@ import React from 'react';
 
 import { useAuth } from '../auth/AuthContext';
 import LoadingView from '../components/LoadingView';
+import AddReturnPhotosScreen from '../screens/AddReturnPhotosScreen';
 import CreateReturnScreen from '../screens/CreateReturnScreen';
 import LoginScreen from '../screens/LoginScreen';
 import ReturnDetailsScreen from '../screens/ReturnDetailsScreen';
@@ -33,6 +34,7 @@ export default function AppNavigator() {
             <Stack.Screen name="ReturnList" component={ReturnListScreen} options={{ title: 'My Returns' }} />
             <Stack.Screen name="CreateReturn" component={CreateReturnScreen} options={{ title: 'New Return' }} />
             <Stack.Screen name="ReturnDetails" component={ReturnDetailsScreen} options={{ title: 'Return Details' }} />
+            <Stack.Screen name="AddReturnPhotos" component={AddReturnPhotosScreen} options={{ title: 'Add Photos', headerBackVisible: false }} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

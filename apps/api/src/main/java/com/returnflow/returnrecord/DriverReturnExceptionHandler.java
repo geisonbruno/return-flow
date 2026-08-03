@@ -6,6 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 /**
  * Driver-return-specific {@code ProblemDetail} mapping, added on top of the
@@ -99,6 +102,46 @@ class DriverReturnExceptionHandler {
 	@ExceptionHandler(RouteTenantMismatchException.class)
 	ProblemDetail handleRouteTenantMismatch() {
 		return problem(HttpStatus.BAD_REQUEST, "Route Tenant Mismatch", "The driver's route does not belong to this tenant.");
+	}
+
+	@ExceptionHandler(ReturnPhotoNotFoundException.class)
+	ProblemDetail handlePhotoNotFound() {
+		return problem(HttpStatus.NOT_FOUND, "Photo Not Found", "Photo not found.");
+	}
+
+	@ExceptionHandler(InvalidPhotoFileException.class)
+	ProblemDetail handleInvalidPhotoFile() {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Photo File",
+				"The uploaded file must be a non-empty JPEG image of 5 MB or less.");
+	}
+
+	@ExceptionHandler(PhotoLimitExceededException.class)
+	ProblemDetail handlePhotoLimitExceeded() {
+		return problem(HttpStatus.CONFLICT, "Photo Limit Exceeded", "A return can have at most five photos.");
+	}
+
+	/** Missing "file" multipart part entirely (as opposed to an empty file, which reaches {@link InvalidPhotoFileException}). */
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	ProblemDetail handleMissingPart() {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Photo File", "A file is required.");
+	}
+
+	/**
+	 * Rejected by {@code spring.servlet.multipart.max-file-size} before this
+	 * module's own {@code ReturnPhotoService} size check ever runs — a 400,
+	 * not a 413, so the client sees one consistent status for "too large"
+	 * regardless of which layer (container-level multipart limit, or this
+	 * module's own re-check) actually caught it.
+	 */
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	ProblemDetail handleUploadTooLarge() {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Photo File", "The uploaded file must be 5 MB or less.");
+	}
+
+	/** Fallback for any other malformed multipart request; more specific multipart exceptions above take precedence. */
+	@ExceptionHandler(MultipartException.class)
+	ProblemDetail handleMalformedMultipart() {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Photo File", "The upload request was malformed.");
 	}
 
 	private static ProblemDetail problem(HttpStatus status, String title, String detail) {

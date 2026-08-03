@@ -52,9 +52,11 @@ export default function CreateReturnScreen({ navigation }: Props) {
     try {
       const created = await createReturn(payload);
       // replace, not navigate: the form is gone from the stack, so back
-      // navigation from Return Details goes to My Returns, not back into a
-      // just-submitted (and now pointless) create form.
-      navigation.replace('ReturnDetails', { returnId: created.id });
+      // navigation goes to My Returns, not back into a just-submitted (and
+      // now pointless) create form. Goes to AddReturnPhotos, not straight to
+      // Return Details, so the driver can attach photos immediately —
+      // Skip/Finish on that screen lead to Return Details either way.
+      navigation.replace('AddReturnPhotos', { returnId: created.id });
     } catch (error) {
       setSubmitError(toSafeErrorMessage(error, 'Unable to create the return. Please review the information and try again.'));
       setSubmitting(false);

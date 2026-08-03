@@ -42,7 +42,7 @@ describe('CreateReturnScreen', () => {
     expect(screen.getByTestId('reason-details-input').props.value).toBe('');
   });
 
-  it('submits the exact backend payload and navigates to Return Details on success', async () => {
+  it('submits the exact backend payload and navigates to Add Photos on success', async () => {
     (createReturn as jest.Mock).mockResolvedValue({ id: 'return-123' });
     const navigation = buildNavigation();
     render(<CreateReturnScreen navigation={navigation as any} route={{} as any} />);
@@ -66,7 +66,7 @@ describe('CreateReturnScreen', () => {
         observation: 'Box was open',
       }),
     );
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-123' }));
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-123' }));
   });
 
   it('prevents a duplicate submission while the first one is still in flight', async () => {
@@ -87,7 +87,7 @@ describe('CreateReturnScreen', () => {
     fireEvent.press(screen.getByTestId('create-return-submit-button'));
 
     resolveCreate({ id: 'return-123' });
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-123' }));
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-123' }));
     expect(createReturn).toHaveBeenCalledTimes(1);
   });
 

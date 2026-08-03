@@ -61,6 +61,11 @@ describe('ReturnListScreen', () => {
         status: 'AWAITING_WAREHOUSE',
         driver: { id: 'd1', fullName: 'Driver One' },
         route: { id: 'r1', code: 'R1', name: 'Route One', active: true },
+        photos: [
+          { id: 'p1', contentType: 'image/jpeg', sizeBytes: 1, position: 1, contentPath: '/x', createdAt: '' },
+          { id: 'p2', contentType: 'image/jpeg', sizeBytes: 1, position: 2, contentPath: '/x', createdAt: '' },
+          { id: 'p3', contentType: 'image/jpeg', sizeBytes: 1, position: 3, contentPath: '/x', createdAt: '' },
+        ],
         createdAt: '2026-08-02T01:00:00.000Z',
         updatedAt: '2026-08-02T01:00:00.000Z',
       },
@@ -77,6 +82,7 @@ describe('ReturnListScreen', () => {
         status: 'AWAITING_WAREHOUSE',
         driver: { id: 'd1', fullName: 'Driver One' },
         route: { id: 'r1', code: 'R1', name: 'Route One', active: true },
+        photos: [],
         createdAt: '2026-08-01T01:00:00.000Z',
         updatedAt: '2026-08-01T01:00:00.000Z',
       },
@@ -92,6 +98,8 @@ describe('ReturnListScreen', () => {
     expect(screen.getByText('Widget X200')).toBeTruthy();
     expect(screen.getByText('Gadget Y300')).toBeTruthy();
     expect(screen.queryByText('obs')).toBeNull();
+    expect(screen.getByText('Photos: 3')).toBeTruthy();
+    expect(screen.getByText('Photos: 0')).toBeTruthy();
   });
 
   it('shows an error state with Retry, and Retry reloads the list', async () => {

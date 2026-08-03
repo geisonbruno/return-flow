@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-import { authorizedRequestJson, onSessionExpired, setSession } from './apiClient';
+import { authorizedMultipartRequest, authorizedRequestJson, onSessionExpired, setSession } from './apiClient';
 
 jest.mock('../config/environment', () => ({
   getApiBaseUrl: () => 'http://test-api.local',
@@ -142,5 +142,52 @@ describe('authorizedRequestJson', () => {
     const message = caught instanceof Error ? caught.message : String(caught);
     expect(message).not.toContain('super-secret-access-token');
     expect(message).not.toContain('super-secret-refresh-token');
+  });
+});
+
+describe('authorizedMultipartRequest', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    jest.clearAllMocks();
+    setSession(null);
+  });
+
+  it('sends the FormData body as-is, without forcing a JSON Content-Type header', async () => {
+    setSession({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(201, { id: 'photo-1' }));
+    const formData = new FormData();
+    formData.append('file', 'stand-in-file-value');
+
+    await authorizedMultipartRequest('/api/v1/driver/returns/r1/photos', formData);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    expect(init?.body).toBe(formData);
+    expect((init?.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer access-1');
+  });
+
+  it('retries exactly once after a successful refresh, same as the JSON path', async () => {
+    setSession({ accessToken: 'expired', refreshToken: 'refresh-1' });
+    let uploadCallCount = 0;
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/auth/refresh')) {
+        return jsonResponse(200, REFRESHED_SESSION);
+      }
+      uploadCallCount += 1;
+      return uploadCallCount === 1 ? jsonResponse(401, { title: 'Unauthorized' }) : jsonResponse(201, { id: 'photo-1' });
+    });
+
+    const result = await authorizedMultipartRequest('/api/v1/driver/returns/r1/photos', new FormData());
+
+    expect(result).toEqual({ id: 'photo-1' });
+    expect(uploadCallCount).toBe(2);
+  });
+
+  it('propagates a safe error when the upload fails outright', async () => {
+    setSession({ accessToken: 'access-1', refreshToken: 'refresh-1' });
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(400, { title: 'Invalid Photo File', detail: 'The uploaded file must be a non-empty JPEG image.' }));
+
+    await expect(authorizedMultipartRequest('/api/v1/driver/returns/r1/photos', new FormData())).rejects.toThrow();
   });
 });

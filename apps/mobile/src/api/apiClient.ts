@@ -6,6 +6,15 @@ import { ApiError } from './problemDetails';
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
+  /**
+   * When true, `body` is sent as-is (expected to already be a `FormData`)
+   * and no `Content-Type` header is set — the platform's `fetch` must be
+   * left to generate its own `multipart/form-data; boundary=...` header.
+   * Manually setting `Content-Type: multipart/form-data` without the
+   * boundary the platform actually used would make the server unable to
+   * parse the request at all.
+   */
+  multipart?: boolean;
 }
 
 /**
@@ -47,11 +56,15 @@ async function rawRequest<T>(path: string, options: RequestOptions, accessToken?
     response = await fetch(await toUrl(path), {
       method: options.method ?? 'GET',
       headers: {
-        'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(options.multipart ? {} : { 'Content-Type': 'application/json' }),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: options.multipart
+        ? (options.body as FormData)
+        : options.body !== undefined
+          ? JSON.stringify(options.body)
+          : undefined,
     });
   } catch {
     throw ApiError.network();
@@ -101,7 +114,7 @@ function refreshOnce(): Promise<AuthSession> {
  * later app restart would try to resume with an already-superseded refresh
  * token.
  */
-export async function authorizedRequestJson<T>(path: string, options: RequestOptions = {}, retried = false): Promise<T> {
+async function authorizedRequest<T>(path: string, options: RequestOptions, retried = false): Promise<T> {
   if (!currentSession) {
     throw new Error('No authenticated session.');
   }
@@ -115,7 +128,7 @@ export async function authorizedRequestJson<T>(path: string, options: RequestOpt
       const refreshed = await refreshOnce();
       setSession(refreshed);
       await saveTokens(refreshed);
-      return await authorizedRequestJson<T>(path, options, true);
+      return await authorizedRequest<T>(path, options, true);
     } catch (refreshError) {
       setSession(null);
       await clearTokens();
@@ -123,4 +136,18 @@ export async function authorizedRequestJson<T>(path: string, options: RequestOpt
       throw refreshError;
     }
   }
+}
+
+export function authorizedRequestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return authorizedRequest<T>(path, options);
+}
+
+/**
+ * Authenticated multipart upload — shares the exact same de-duplicated
+ * refresh-and-retry-once behavior as {@link authorizedRequestJson} (see
+ * {@link authorizedRequest}), just with a `FormData` body and no
+ * `Content-Type` header forced onto the request (see {@link RequestOptions.multipart}).
+ */
+export function authorizedMultipartRequest<T>(path: string, formData: FormData): Promise<T> {
+  return authorizedRequest<T>(path, { method: 'POST', body: formData, multipart: true });
 }

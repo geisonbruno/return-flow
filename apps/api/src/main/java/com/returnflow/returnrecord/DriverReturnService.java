@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.returnflow.auth.AuthenticatedPrincipal;
 import com.returnflow.returnrecord.dto.CreateReturnRequest;
 import com.returnflow.returnrecord.dto.DriverSummaryResponse;
+import com.returnflow.returnrecord.dto.ReturnPhotoResponse;
 import com.returnflow.returnrecord.dto.ReturnResponse;
 import com.returnflow.route.Route;
 import com.returnflow.route.dto.RouteSummaryResponse;
@@ -38,12 +39,14 @@ class DriverReturnService {
 
 	private final ReturnRecordCreator returnRecordCreator;
 	private final ReturnRecordRepository returnRecordRepository;
+	private final ReturnPhotoRepository returnPhotoRepository;
 	private final UserRepository userRepository;
 
 	DriverReturnService(ReturnRecordCreator returnRecordCreator, ReturnRecordRepository returnRecordRepository,
-			UserRepository userRepository) {
+			ReturnPhotoRepository returnPhotoRepository, UserRepository userRepository) {
 		this.returnRecordCreator = returnRecordCreator;
 		this.returnRecordRepository = returnRecordRepository;
+		this.returnPhotoRepository = returnPhotoRepository;
 		this.userRepository = userRepository;
 	}
 
@@ -55,14 +58,15 @@ class DriverReturnService {
 				request.productName(), request.reason(), request.reasonDetails(), request.quantity(), request.unit(),
 				request.observation());
 		ReturnRecord created = returnRecordCreator.create(tenant, driver, newReturn);
-		return toResponse(created);
+		// A brand-new return can never already have photos — no query needed.
+		return toResponse(created, List.of());
 	}
 
 	@Transactional(readOnly = true)
 	List<ReturnResponse> list(AuthenticatedPrincipal principal) {
 		UUID tenantId = TenantContext.get().getId();
 		return returnRecordRepository.findByTenantIdAndDriverIdOrderByCreatedAtDescIdDesc(tenantId, principal.userId())
-				.stream().map(DriverReturnService::toResponse).toList();
+				.stream().map(returnRecord -> toResponse(returnRecord, photosFor(returnRecord, tenantId))).toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -71,7 +75,12 @@ class DriverReturnService {
 		ReturnRecord returnRecord = returnRecordRepository
 				.findByIdAndTenantIdAndDriverId(returnId, tenantId, principal.userId())
 				.orElseThrow(ReturnRecordNotFoundException::new);
-		return toResponse(returnRecord);
+		return toResponse(returnRecord, photosFor(returnRecord, tenantId));
+	}
+
+	private List<ReturnPhotoResponse> photosFor(ReturnRecord returnRecord, UUID tenantId) {
+		return returnPhotoRepository.findByReturnRecordIdAndTenantIdOrderByPositionAsc(returnRecord.getId(), tenantId)
+				.stream().map(photo -> ReturnPhotoService.toResponse(returnRecord.getId(), photo)).toList();
 	}
 
 	/**
@@ -86,7 +95,7 @@ class DriverReturnService {
 				.orElseThrow(() -> new IllegalStateException("Authenticated driver not found."));
 	}
 
-	private static ReturnResponse toResponse(ReturnRecord returnRecord) {
+	private static ReturnResponse toResponse(ReturnRecord returnRecord, List<ReturnPhotoResponse> photos) {
 		User driver = returnRecord.getDriver();
 		Route route = returnRecord.getRoute();
 		return new ReturnResponse(
@@ -102,6 +111,7 @@ class DriverReturnService {
 				returnRecord.getStatus(),
 				new DriverSummaryResponse(driver.getId(), driver.getFullName()),
 				new RouteSummaryResponse(route.getId(), route.getCode(), route.getName(), route.isActive()),
+				photos,
 				returnRecord.getCreatedAt(),
 				returnRecord.getUpdatedAt());
 	}

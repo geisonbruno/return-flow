@@ -32,6 +32,21 @@ export interface RouteSummary {
   active: boolean;
 }
 
+/**
+ * Matches `returnrecord.dto.ReturnPhotoResponse` exactly — public metadata
+ * only. No storageKey, tenantId, driverId, or filesystem path: `contentPath`
+ * is an API-relative path (never an absolute/localhost URL, never a token in
+ * the query string) resolved against the app's own configured API base URL.
+ */
+export interface ReturnPhoto {
+  id: string;
+  contentType: string;
+  sizeBytes: number;
+  position: number;
+  contentPath: string;
+  createdAt: string;
+}
+
 /** Matches `returnrecord.dto.ReturnResponse` exactly — the driver API's response contract. */
 export interface ReturnRecord {
   id: string;
@@ -46,6 +61,8 @@ export interface ReturnRecord {
   status: ReturnStatus;
   driver: DriverSummary;
   route: RouteSummary;
+  /** Always an array — empty right after creation, never null. */
+  photos: ReturnPhoto[];
   createdAt: string;
   updatedAt: string;
 }

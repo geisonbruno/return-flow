@@ -9,4 +9,5 @@ export type RootStackParamList = {
   ReturnList: undefined;
   CreateReturn: undefined;
   ReturnDetails: { returnId: string };
+  AddReturnPhotos: { returnId: string };
 };

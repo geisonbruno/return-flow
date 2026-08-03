@@ -451,8 +451,10 @@ Requirements:
 - removing or replacing photos is allowed only while the driver may edit the return;
 - after `IN_REVIEW`, photos are immutable.
 
+Phase 5A (the first return-photo slice) ships upload, list, and authenticated content retrieval only — no remove/replace/delete endpoint yet, since no driver-edit endpoint exists yet either. Removing and replacing while the driver may edit remains the intended V1 behavior once that editing capability is built.
+
 Production storage target: Cloudflare R2.
-Local development target: an S3-compatible local service such as MinIO.
+Local development target (Phase 5A): a filesystem-backed adapter behind the application storage interface below, swappable for MinIO or the eventual R2 adapter without changing calling code — chosen for MVP simplicity, since local development does not need a running object-storage service to exercise the photo workflow.
 
 Cloud provider access must be behind an application storage interface.
 

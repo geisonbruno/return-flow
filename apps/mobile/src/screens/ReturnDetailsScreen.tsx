@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, toSafeErrorMessage } from '../api/problemDetails';
@@ -15,7 +15,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ReturnDetails'>;
 
 type ScreenState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; record: ReturnRecord };
 
-export default function ReturnDetailsScreen({ route }: Props) {
+const MAX_PHOTOS = 5;
+
+export default function ReturnDetailsScreen({ navigation, route }: Props) {
   const { returnId } = route.params;
   const [state, setState] = useState<ScreenState>({ status: 'loading' });
 
@@ -66,6 +68,32 @@ export default function ReturnDetailsScreen({ route }: Props) {
         <DetailRow label="Driver" value={record.driver.fullName} />
         <DetailRow label="Route" value={`${record.route.code} — ${record.route.name}`} />
         <DetailRow label="Created" value={formatDateTime(record.createdAt)} />
+
+        <View style={styles.photosSection}>
+          <View style={styles.photosSectionHeader}>
+            <Text style={styles.rowLabel}>Photos</Text>
+            {record.photos.length < MAX_PHOTOS ? (
+              <Pressable
+                onPress={() => navigation.navigate('AddReturnPhotos', { returnId: record.id })}
+                accessibilityRole="button"
+                testID="add-photos-button"
+              >
+                <Text style={styles.addPhotosLabel}>Add photos</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {record.photos.length === 0 ? (
+            <Text style={styles.emptyPhotosText}>No photos yet.</Text>
+          ) : (
+            <View style={styles.photosList}>
+              {record.photos.map((photo) => (
+                <View key={photo.id} style={styles.photoChip} testID={`photo-${photo.position}`}>
+                  <Text style={styles.photoChipLabel}>Photo {photo.position}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -119,5 +147,38 @@ const styles = StyleSheet.create({
   rowValue: {
     fontSize: 16,
     color: '#111827',
+  },
+  photosSection: {
+    gap: 8,
+    paddingVertical: 8,
+  },
+  photosSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  addPhotosLabel: {
+    color: '#2563EB',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  emptyPhotosText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  photosList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  photoChip: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  photoChipLabel: {
+    fontSize: 13,
+    color: '#374151',
   },
 });

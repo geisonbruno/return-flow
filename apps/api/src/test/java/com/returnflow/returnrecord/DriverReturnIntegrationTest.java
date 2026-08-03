@@ -133,6 +133,8 @@ class DriverReturnIntegrationTest {
 				.andExpect(jsonPath("$.driver.fullName").value("Driver One"))
 				.andExpect(jsonPath("$.route.id").value(route.getId().toString()))
 				.andExpect(jsonPath("$.route.code").value("R1"))
+				.andExpect(jsonPath("$.photos").isArray())
+				.andExpect(jsonPath("$.photos.length()").value(0))
 				.andExpect(jsonPath("$.createdAt").exists());
 	}
 
@@ -425,7 +427,9 @@ class DriverReturnIntegrationTest {
 				.andExpect(jsonPath("$[0].id").value(secondId))
 				.andExpect(jsonPath("$[1].id").value(firstId))
 				.andExpect(jsonPath("$[0].productName").value("Widget X200"))
-				.andExpect(jsonPath("$[1].productName").value("Widget X200"));
+				.andExpect(jsonPath("$[1].productName").value("Widget X200"))
+				.andExpect(jsonPath("$[0].photos").isArray())
+				.andExpect(jsonPath("$[0].photos.length()").value(0));
 	}
 
 	@Test
@@ -445,7 +449,9 @@ class DriverReturnIntegrationTest {
 		mockMvc.perform(get("/api/v1/driver/returns/" + id).header(HttpHeaders.AUTHORIZATION, driverToken))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value(id))
-				.andExpect(jsonPath("$.productName").value("Widget X200"));
+				.andExpect(jsonPath("$.productName").value("Widget X200"))
+				.andExpect(jsonPath("$.photos").isArray())
+				.andExpect(jsonPath("$.photos.length()").value(0));
 	}
 
 	@Test

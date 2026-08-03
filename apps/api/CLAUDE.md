@@ -105,7 +105,7 @@ Do not generalize the V1 domain to `Incident`.
 
 - upload/delete/read metadata;
 - Cloudflare R2 production adapter;
-- MinIO/local adapter;
+- filesystem-backed local/MVP adapter (Phase 5A) behind the same `ReturnMediaStorage` interface — MinIO and the eventual R2 adapter remain valid future implementations of that interface;
 - generated object keys;
 - tenant isolation;
 - file validation.
@@ -217,7 +217,7 @@ tenants/{tenantId}/returns/{returnId}/signatures/customer/{generatedId}.png
 tenants/{tenantId}/returns/{returnId}/signatures/warehouse/{generatedId}.png
 ```
 
-Never accept arbitrary final keys from clients. Validate actual content where practical. Photos and customer signature can change only while the return is waiting.
+Never accept arbitrary final keys from clients. Validate actual content where practical. Photos and customer signature can change only while the return is waiting. Phase 5A ships upload/list/authenticated-content-retrieval only — no remove/replace endpoint yet, since driver editing does not exist yet either.
 
 ## API conventions
 

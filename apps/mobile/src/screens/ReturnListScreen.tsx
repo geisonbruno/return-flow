@@ -86,6 +86,7 @@ export default function ReturnListScreen({ navigation }: Props) {
             <View style={styles.cardMetaRow}>
               <Text style={styles.meta}>{formatQuantityAndUnit(item.quantity, item.unit)}</Text>
               <Text style={styles.meta}>{REASON_LABELS[item.reason]}</Text>
+              <Text style={styles.meta}>Photos: {item.photos.length}</Text>
             </View>
             <Text style={styles.date}>{formatDateTime(item.createdAt)}</Text>
           </Pressable>

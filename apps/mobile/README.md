@@ -39,6 +39,17 @@ The `local` profile allows exactly the browser origin `http://localhost:8081` to
 
 Expo SecureStore has no browser implementation, so the web build automatically uses `src/auth/tokenStorage.web.ts` (plain browser `localStorage`) instead of `src/auth/tokenStorage.ts` (Expo SecureStore) — this swap is automatic via React Native Web's platform-specific file resolution, no manual step needed. **`localStorage` is a development/testing fallback only, not equivalent security to native SecureStore** — native iOS/Android builds are unaffected and always use SecureStore.
 
+## Photos (Phase 5A)
+
+After creating a return, the app opens **Add Photos** so the driver can attach zero to five photos immediately, or tap **Skip for now** and add them later from Return Details (**Add photos**, shown while the return has fewer than five).
+
+- **Add from library** and **Take photo** each request the relevant permission (media library / camera) only when pressed, and show a clear message if denied.
+- Every selected photo is normalized to JPEG on-device before upload (resized only if its longest edge exceeds 1600px, compressed to ~0.8 quality) — this keeps upload size predictable and removes any dependency on the original format (e.g. HEIC).
+- **Take photo** is hidden on web — the browser camera isn't part of this workflow; library selection still works.
+- Uploads happen one at a time; a failed upload can be retried without re-creating the return, and the screen makes clear the return itself already exists.
+- Photos are immutable once uploaded — there is no remove/replace/delete action in this phase.
+- Photo binary content is only ever reachable through an authenticated API request (`GET /api/v1/driver/returns/{returnId}/photos/{photoId}/content`) — never a public URL, and never a token in a query string.
+
 ## Scope
 
-This phase (Phase 4) covers login, session restoration, viewing your own returns, creating a return, viewing return details, and logout — the non-media driver workflow. Photos and customer signatures are out of scope until Phase 5.
+This phase (Phase 4) covers login, session restoration, viewing your own returns, creating a return, viewing return details, and logout — the non-media driver workflow. Phase 5A adds return photos (see above). Customer signatures are out of scope until Phase 5B.

@@ -40,8 +40,8 @@ Do not add planned or actual commit messages to this document.
 7. Phase 3B — Driver return API
 8. Mobile UX checkpoint
 9. Phase 4 — Mobile driver workflow
-10. Phase 5A — Media and signature backend
-11. Phase 5B — Mobile photos and customer signature
+10. Phase 5A — Return photos
+11. Phase 5B — Customer signature
 12. Web UX checkpoint
 13. Phase 6 — Operational dashboard
 14. Phase 7A — Warehouse review backend
@@ -444,85 +444,56 @@ Real manual use of the application after Phase 4 showed that a return needs an e
 
 ---
 
-## 12. Phase 5A — Media and signature backend
+## 12. Phase 5A — Return photos
+
+Corrected split (tracked in `progress.md`, not a renumbered roadmap entry): Phase 5 is split by **feature**, not by layer — 5A delivers the complete photo vertical slice (backend and mobile together); 5B delivers the complete customer-signature vertical slice. The originally planned backend/mobile layer split, and remove/replace photo operations, are superseded by this section.
 
 ### Goal
 
-Add secure tenant-scoped storage and server-side media rules.
+Let a DRIVER attach zero to five JPEG photos to their own return, establishing a small, reusable media-storage foundation Phase 5B can reuse for the customer signature.
 
 ### Deliverables
 
-- application storage interface;
-- MinIO local adapter;
-- R2-compatible production adapter/configuration;
-- backend-generated tenant-scoped object keys;
-- `ReturnPhoto` metadata and migrations;
-- customer signature object metadata;
-- upload, remove, and replace operations allowed only while the driver can edit;
-- maximum five photos;
-- accepted content-type validation;
-- server-side file-size limits;
-- image metadata validation appropriate for the chosen implementation;
-- immutable media after `IN_REVIEW`;
-- cleanup behavior for failed uploads and replaced objects;
-- authorization and storage integration tests.
+- `storage.ReturnMediaStorage` interface (store/read a binary object) separating PostgreSQL metadata from binary content;
+- a filesystem-backed adapter for this MVP, behind that same interface, so it can later be replaced by a Cloudflare R2/S3-compatible adapter without changing calling code (no MinIO/cloud adapter in this phase);
+- `ReturnPhoto` metadata and one migration;
+- DRIVER-only, tenant- and driver-scoped upload/list/content endpoints — one photo uploaded per request;
+- server-generated storage keys and photo position; maximum five photos per return, enforced correctly under concurrent uploads;
+- accepted-content-type (`image/jpeg` only) and file-size (5 MB) validation, independent of the client;
+- immutable photo records — no update/delete/replace endpoint in this phase;
+- mobile JPEG normalization (resize/compress) before upload;
+- `AddReturnPhotosScreen` (library selection, camera capture where available, local preview, upload progress, retry, Skip/Finish) reachable right after creating a return and again from Return Details;
+- a lightweight photo-count indicator on My Returns and Return Details;
+- authorization and storage-adapter tests.
 
 ### Excluded
 
-- mobile capture UI;
+- customer signature (Phase 5B);
 - warehouse signature;
 - PDF;
-- public object URLs;
-- base64 image storage in PostgreSQL.
+- public object URLs or tokens in a query string;
+- base64 image storage in PostgreSQL or in `ReturnResponse`;
+- photo deletion or replacement;
+- a DRAFT return status or a separate submission endpoint;
+- offline upload queues, background sync, push notifications.
 
 ### Acceptance criteria
 
-- storage keys do not use original filenames;
-- every object path is tenant- and return-scoped;
-- cross-tenant access is impossible through the API;
-- a sixth photo is rejected;
-- media cannot change after review starts;
-- invalid type/size is rejected safely;
-- API tests and build pass.
+- storage keys are always server-generated, never a client filename, and stay inside the configured storage root;
+- every object path and every photo record is tenant- and return-scoped;
+- cross-tenant and cross-driver access (including a different driver on the same route) behaves as not found;
+- a sixth photo is rejected, correctly even under concurrent uploads;
+- invalid type/size is rejected safely, without leaking a filesystem path or storage key;
+- photo binary content is reachable only through an authenticated endpoint;
+- mobile normalizes every upload to JPEG before sending it;
+- a failed photo upload never duplicates the underlying return;
+- API and mobile tests pass.
 
 ---
 
-## 13. Phase 5B — Mobile photos and customer signature
+## 13. Phase 5B — Customer signature
 
-### Goal
-
-Complete the driver record and enforce the final submission requirements.
-
-### Deliverables
-
-- photo capture and gallery selection;
-- client-side resize/compression;
-- photo preview, remove, replace, ordering where required, and maximum-five feedback;
-- customer representative name confirmation;
-- drawn customer signature with clear, redo, preview, and confirm actions;
-- upload progress and recoverable failure states;
-- backend integration for photo and signature storage;
-- final validation requiring customer representative name and signature;
-- immutable media/read-only behavior after review begins;
-- focused mobile and API contract tests.
-
-### Excluded
-
-- offline upload queue;
-- background synchronization;
-- push notifications;
-- warehouse signature;
-- photos in PDF.
-
-### Acceptance criteria
-
-- a driver can create a complete signed return;
-- zero to five photos are supported;
-- large photos are reduced before upload;
-- customer signature is required and previewable;
-- failed upload does not falsely complete the return;
-- media cannot change after review begins;
-- mobile checks and relevant API tests pass.
+Not started. Reserved for the customer-signature vertical slice (drawn signature, customer representative name, required before the driver's record is considered complete per root `CLAUDE.md` §13), reusing the `storage.ReturnMediaStorage` abstraction Phase 5A established. Warehouse signature remains a separate, later phase (web review workflow), not part of 5B.
 
 ---
 
