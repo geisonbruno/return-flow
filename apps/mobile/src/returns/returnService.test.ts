@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
 
 import { authorizedMultipartRequest, authorizedRequestJson } from '../api/apiClient';
-import { listReturnPhotos, uploadReturnPhoto } from './returnService';
+import { createReturnSignature, getReturnSignature, listReturnPhotos, uploadReturnPhoto } from './returnService';
 import type { NormalizedPhoto } from './photoNormalization';
+import type { CreateReturnSignaturePayload } from './types';
 
 jest.mock('../api/apiClient');
 
@@ -161,5 +162,51 @@ describe('listReturnPhotos', () => {
     await listReturnPhotos('return-1');
 
     expect(authorizedRequestJson).toHaveBeenCalledWith('/api/v1/driver/returns/return-1/photos');
+  });
+});
+
+describe('createReturnSignature', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('posts exactly signerName and strokes to the signature endpoint', async () => {
+    (authorizedRequestJson as jest.Mock).mockResolvedValue({ id: 'sig-1' });
+    const payload: CreateReturnSignaturePayload = {
+      signerName: 'John Smith',
+      strokes: [[{ x: 0.1, y: 0.2 }, { x: 0.2, y: 0.3 }]],
+    };
+
+    await createReturnSignature('return-1', payload);
+
+    expect(authorizedRequestJson).toHaveBeenCalledWith('/api/v1/driver/returns/return-1/signature', {
+      method: 'POST',
+      body: payload,
+    });
+  });
+
+  it('never sends tenantId, driverId, signedAt, storageKey, or a return status', async () => {
+    (authorizedRequestJson as jest.Mock).mockResolvedValue({ id: 'sig-1' });
+    const payload: CreateReturnSignaturePayload = { signerName: 'John Smith', strokes: [[{ x: 0.1, y: 0.2 }, { x: 0.2, y: 0.3 }]] };
+
+    await createReturnSignature('return-1', payload);
+
+    const [, options] = (authorizedRequestJson as jest.Mock).mock.calls[0];
+    const sentKeys = Object.keys(options.body as object);
+    expect(sentKeys).toEqual(['signerName', 'strokes']);
+  });
+});
+
+describe('getReturnSignature', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('requests the signature metadata for the given return', async () => {
+    (authorizedRequestJson as jest.Mock).mockResolvedValue({ id: 'sig-1' });
+
+    await getReturnSignature('return-1');
+
+    expect(authorizedRequestJson).toHaveBeenCalledWith('/api/v1/driver/returns/return-1/signature');
   });
 });

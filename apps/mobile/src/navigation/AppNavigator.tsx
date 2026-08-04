@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import LoadingView from '../components/LoadingView';
 import AddReturnPhotosScreen from '../screens/AddReturnPhotosScreen';
 import CreateReturnScreen from '../screens/CreateReturnScreen';
+import CustomerSignatureScreen from '../screens/CustomerSignatureScreen';
 import LoginScreen from '../screens/LoginScreen';
 import ReturnDetailsScreen from '../screens/ReturnDetailsScreen';
 import ReturnListScreen from '../screens/ReturnListScreen';
@@ -35,6 +36,11 @@ export default function AppNavigator() {
             <Stack.Screen name="CreateReturn" component={CreateReturnScreen} options={{ title: 'New Return' }} />
             <Stack.Screen name="ReturnDetails" component={ReturnDetailsScreen} options={{ title: 'Return Details' }} />
             <Stack.Screen name="AddReturnPhotos" component={AddReturnPhotosScreen} options={{ title: 'Add Photos', headerBackVisible: false }} />
+            <Stack.Screen
+              name="CustomerSignature"
+              component={CustomerSignatureScreen}
+              options={{ title: 'Customer Signature', headerBackVisible: false }}
+            />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

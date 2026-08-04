@@ -144,6 +144,26 @@ class DriverReturnExceptionHandler {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid Photo File", "The upload request was malformed.");
 	}
 
+	@ExceptionHandler(InvalidSignerNameException.class)
+	ProblemDetail handleInvalidSignerName() {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Signer Name", "Signer name is required and must be 100 characters or fewer.");
+	}
+
+	@ExceptionHandler(InvalidSignatureStrokesException.class)
+	ProblemDetail handleInvalidSignatureStrokes() {
+		return problem(HttpStatus.BAD_REQUEST, "Invalid Signature", "The signature drawing is missing or invalid.");
+	}
+
+	@ExceptionHandler(SignatureAlreadyExistsException.class)
+	ProblemDetail handleSignatureAlreadyExists() {
+		return problem(HttpStatus.CONFLICT, "Signature Already Exists", "This return already has a customer signature.");
+	}
+
+	@ExceptionHandler(ReturnSignatureNotFoundException.class)
+	ProblemDetail handleSignatureNotFound() {
+		return problem(HttpStatus.NOT_FOUND, "Signature Not Found", "Signature not found.");
+	}
+
 	private static ProblemDetail problem(HttpStatus status, String title, String detail) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
 		problem.setTitle(title);

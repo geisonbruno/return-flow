@@ -213,11 +213,13 @@ Recommended key shapes:
 
 ```text
 tenants/{tenantId}/returns/{returnId}/photos/{generatedId}.jpg
-tenants/{tenantId}/returns/{returnId}/signatures/customer/{generatedId}.png
-tenants/{tenantId}/returns/{returnId}/signatures/warehouse/{generatedId}.png
+tenants/{tenantId}/returns/{returnId}/signatures/customer/{generatedId}.svg
+tenants/{tenantId}/returns/{returnId}/signatures/warehouse/{generatedId}.svg
 ```
 
 Never accept arbitrary final keys from clients. Validate actual content where practical. Photos and customer signature can change only while the return is waiting. Phase 5A ships upload/list/authenticated-content-retrieval only — no remove/replace endpoint yet, since driver editing does not exist yet either.
+
+The customer signature (Phase 5B) never arrives as an image: the client sends only a signer name and normalized (0..1) stroke points as JSON, and the backend renders them into a sanitized, deterministic `image/svg+xml` document (no scripts, no external resources, no client-supplied markup) before storing it through `ReturnMediaStorage`. A return has at most zero or one signature — enforced by a unique constraint plus the same row-locking pattern `ReturnPhotoService` uses — and it is immutable once created, with the same upload/list-equivalent/authenticated-content-retrieval-only scope as photos (`POST`/`GET` metadata, `GET .../content`; no replace or delete endpoint).
 
 ## API conventions
 

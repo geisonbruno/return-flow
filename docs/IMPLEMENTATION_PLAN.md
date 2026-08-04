@@ -493,7 +493,43 @@ Let a DRIVER attach zero to five JPEG photos to their own return, establishing a
 
 ## 13. Phase 5B — Customer signature
 
-Not started. Reserved for the customer-signature vertical slice (drawn signature, customer representative name, required before the driver's record is considered complete per root `CLAUDE.md` §13), reusing the `storage.ReturnMediaStorage` abstraction Phase 5A established. Warehouse signature remains a separate, later phase (web review workflow), not part of 5B.
+The customer-signature vertical slice (drawn signature, customer representative name, required before the driver's record is considered complete per root `CLAUDE.md` §13), reusing the `storage.ReturnMediaStorage` abstraction Phase 5A established. Warehouse signature remains a separate, later phase (web review workflow), not part of 5B.
+
+### Goal
+
+Let a DRIVER capture one customer signature per return, using normalized vector strokes rather than a client-generated image, completing the primary new-return workflow (Create Return → Add Photos → Customer Signature → Return Details).
+
+### Deliverables
+
+- one `ReturnSignature` metadata table/migration, immutable, at most one per return;
+- a small server-side SVG-rendering component that converts validated normalized stroke points into a sanitized `image/svg+xml` document — no client-supplied image, Base64, or markup is ever stored;
+- DRIVER-only, tenant- and driver-scoped create/metadata/content endpoints, safe under concurrent submission (same row-locking pattern as Phase 5A's photo uploads);
+- signer-name and stroke validation (length, point/stroke counts, coordinate bounds, a minimum drawn-length threshold to reject a blank tap), enforced server-side regardless of client checks;
+- `ReturnResponse.signature`, nullable, reflecting pending vs. captured state;
+- a cross-platform (native + Expo Web) `SignaturePad` built on `react-native-svg` and `PanResponder` — not a WebView-based signature library;
+- `CustomerSignatureScreen`, reachable after Add Photos for a newly created return and again from Return Details while a signature is still pending;
+- a lightweight signature-status indicator on My Returns and a Signature section on Return Details, so an interrupted workflow is easy to resume;
+- authorization, validation, SVG-safety, and concurrency tests.
+
+### Excluded
+
+- warehouse signature (a later, separate phase);
+- signature replacement or deletion;
+- multiple signatures per return;
+- remote authenticated rendering of the signature image itself (metadata only in this phase);
+- PDF generation;
+- a DRAFT return status or any change to existing return statuses.
+
+### Acceptance criteria
+
+- a return has zero or one signature, never more, correctly even under concurrent submission attempts;
+- the backend never accepts a client-supplied image, Base64 payload, or raw SVG/HTML — only normalized stroke points and a signer name;
+- the generated SVG contains no scripts, external resources, or client-provided markup;
+- signature content is reachable only through an authenticated endpoint;
+- cross-driver and cross-tenant access to signature endpoints behaves as not found;
+- an interrupted workflow (return created, signature not yet captured) is visible and resumable from Return Details and My Returns;
+- existing photo, product-identification, tenant-isolation, and authentication behavior are unaffected;
+- API and mobile tests pass.
 
 ---
 

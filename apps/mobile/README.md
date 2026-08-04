@@ -64,6 +64,17 @@ After creating a return, the app opens **Add Photos** so the driver can attach z
 - Photos are immutable once uploaded — there is no remove/replace/delete action in this phase.
 - Photo binary content is only ever reachable through an authenticated API request (`GET /api/v1/driver/returns/{returnId}/photos/{photoId}/content`) — never a public URL, and never a token in a query string.
 
+## Customer signature (Phase 5B)
+
+After adding photos (or skipping), the app opens **Customer Signature** so the driver can capture the customer's signature to complete the return. Reopening the return later from **Return Details** while the signature is still pending (an interrupted workflow) leads back to the same screen via **Capture customer signature**.
+
+- The pad (`SignaturePad`) is a custom `react-native-svg` + `PanResponder` component — not a WebView-based signature library — and works identically on native (iOS/Android) and Expo Web.
+- The app never sends an image, Base64, or client-generated SVG to the backend: it sends only the signer's typed name and the drawing as normalized (0..1) stroke points. The backend is the only thing that ever renders the actual image (a sanitized, server-generated SVG).
+- **Undo** removes the last stroke; **Clear** removes all strokes. A signature with no meaningful drawing (a tap, or a barely-moved touch) is rejected client-side before it's ever sent, mirroring the backend's own minimum-drawn-length check.
+- A return can have at most one customer signature. Once captured, this screen shows an **already captured** state instead of a form and safely routes to Return Details — it never allows a second submission.
+- Return Details shows a **Signature** section (**Pending** with a **Capture customer signature** action, or **Captured** with the signer name and timestamp), and My Returns shows a lightweight **Signature: Pending/Captured** indicator on each card — both exist so an interrupted workflow is easy to resume.
+- The signature image itself is not rendered remotely in this phase (only safe metadata — signer name, timestamp) — the same authenticated-content-only approach as photos, deferred here to avoid expanding this phase's scope.
+
 ## Scope
 
-This phase (Phase 4) covers login, session restoration, viewing your own returns, creating a return, viewing return details, and logout — the non-media driver workflow. Phase 5A adds return photos (see above). Customer signatures are out of scope until Phase 5B.
+This phase (Phase 4) covers login, session restoration, viewing your own returns, creating a return, viewing return details, and logout — the non-media driver workflow. Phase 5A adds return photos (see above). Phase 5B adds the customer signature (see above), completing the primary new-return workflow: Create Return → Add Photos → Customer Signature → Return Details.

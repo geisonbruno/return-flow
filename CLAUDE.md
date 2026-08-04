@@ -423,7 +423,6 @@ Signatures are stored as image objects in object storage, not as base64 strings 
 
 Requirements:
 
-- transparent or white background PNG;
 - reasonable size limits;
 - signature preview before confirmation;
 - clear and redo actions;
@@ -432,6 +431,10 @@ Requirements:
 - signature objects isolated by tenant and return.
 
 A typed name is required in addition to each signature.
+
+### 13.1 Customer signature representation (Phase 5B)
+
+The customer signature does not travel as an image file. The mobile client captures the drawing as normalized (0..1) vector stroke points — never Base64, PNG/JPEG bytes, or client-supplied SVG/HTML — and sends only the signer name and that structured point data as JSON. The backend is the only thing that ever produces the actual image: it validates the strokes (bounds, point/stroke limits, a minimum drawn-length threshold to reject a blank tap) and renders them into a sanitized, server-generated `image/svg+xml` document (white background, black stroke, no scripts, no external resources, no client-provided markup), stored through the same `ReturnMediaStorage` abstraction as photos. A return has at most one customer signature, and it is immutable once captured — no replace or delete endpoint. This vector-then-server-render approach is the model for any future signature capture (including the warehouse signature); do not reintroduce a client-uploaded image file for a signature without an explicit product decision to do so.
 
 ---
 
