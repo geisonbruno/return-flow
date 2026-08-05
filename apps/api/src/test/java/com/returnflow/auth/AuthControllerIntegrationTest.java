@@ -166,7 +166,8 @@ class AuthControllerIntegrationTest {
 	void meWithATamperedTokenIsUnauthorizedWithASafeProblemDetailBody() throws Exception {
 		JsonNode session = login(activeAdmin.getEmail(), PASSWORD, status().isOk());
 		String validToken = session.get("accessToken").asText();
-		String tamperedToken = validToken.substring(0, validToken.length() - 1) + (validToken.endsWith("a") ? "b" : "a");
+		String tamperedToken = tamperSignature(validToken);
+		assertThat(tamperedToken).isNotEqualTo(validToken);
 
 		mockMvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + tamperedToken))
 				.andExpect(status().isUnauthorized())
@@ -321,6 +322,30 @@ class AuthControllerIntegrationTest {
 
 	private String uniqueEmail() {
 		return "user-" + UUID.randomUUID() + "@warehouse.example";
+	}
+
+	/**
+	 * Flips one Base64URL character in the middle of the signature segment —
+	 * deliberately not the token's final character. An unpadded Base64URL
+	 * trailing character can carry unused padding bits that don't affect the
+	 * decoded byte value for some encoded lengths, which made a
+	 * previous last-character mutation an occasional no-op (the "tampered"
+	 * token still decoded to the exact same signature bytes and validated
+	 * successfully — see the identical fix in {@code AccessTokenServiceTest}).
+	 * A middle-of-segment character fully contributes to the decoded bytes,
+	 * so this always changes the actual signature.
+	 */
+	private static String tamperSignature(String token) {
+		String[] segments = token.split("\\.");
+		if (segments.length != 3) {
+			throw new IllegalArgumentException("Expected a three-segment JWT, got: " + token);
+		}
+		String signature = segments[2];
+		int index = signature.length() / 2;
+		char original = signature.charAt(index);
+		char replacement = original == 'A' ? 'B' : 'A';
+		String tamperedSignature = signature.substring(0, index) + replacement + signature.substring(index + 1);
+		return segments[0] + "." + segments[1] + "." + tamperedSignature;
 	}
 
 	private org.springframework.test.web.servlet.RequestBuilder loginRequest(String email, String password) throws Exception {

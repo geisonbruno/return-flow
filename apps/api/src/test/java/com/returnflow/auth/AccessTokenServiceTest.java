@@ -49,8 +49,9 @@ class AccessTokenServiceTest {
 	void tamperedTokenFailsValidation() {
 		AccessTokenService service = serviceWithClock(Clock.systemUTC());
 		String token = service.issue(principal).token();
-		String tampered = token.substring(0, token.length() - 1) + (token.endsWith("a") ? "b" : "a");
+		String tampered = tamperSignature(token);
 
+		assertThat(tampered).isNotEqualTo(token);
 		assertThat(service.validate(tampered)).isEmpty();
 	}
 
@@ -120,6 +121,29 @@ class AccessTokenServiceTest {
 		String token = tokenWithClaim("role", "SUPERADMIN");
 
 		assertThat(serviceWithClock(Clock.systemUTC()).validate(token)).isEmpty();
+	}
+
+	/**
+	 * Flips one Base64URL character in the middle of the signature segment —
+	 * deliberately not the token's final character. An unpadded Base64URL
+	 * trailing character can carry unused padding bits that don't affect the
+	 * decoded byte value for some encoded lengths, which made the previous
+	 * last-character mutation an occasional no-op (the "tampered" token
+	 * still decoded to the exact same signature bytes and validated
+	 * successfully). A middle-of-segment character fully contributes to the
+	 * decoded bytes, so this always changes the actual signature.
+	 */
+	private static String tamperSignature(String token) {
+		String[] segments = token.split("\\.");
+		if (segments.length != 3) {
+			throw new IllegalArgumentException("Expected a three-segment JWT, got: " + token);
+		}
+		String signature = segments[2];
+		int index = signature.length() / 2;
+		char original = signature.charAt(index);
+		char replacement = original == 'A' ? 'B' : 'A';
+		String tamperedSignature = signature.substring(0, index) + replacement + signature.substring(index + 1);
+		return segments[0] + "." + segments[1] + "." + tamperedSignature;
 	}
 
 	private static AccessTokenService serviceWithClock(Clock clock) {
