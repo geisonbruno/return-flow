@@ -72,4 +72,14 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: npm test -- --ci
+        # --runInBand: this suite pays a one-time React Native native-mock/module
+        # initialization cost on each test file's first render() (see
+        # PROGRESS.md's Phase 4.1 note on the same pattern in
+        # ReturnListScreen.test.tsx). Under Jest's default parallel workers,
+        # GitHub's standard (2-core) runners let enough of those first renders
+        # land at the same moment to occasionally exceed Jest's 5000ms default
+        # test timeout — not reproducible locally on more capable hardware, and
+        # not a production or test-logic defect. Running in-band serializes
+        # those first-render costs so they never compete for CPU, removing
+        # worker contention as a variable entirely.
+        run: npm test -- --ci --runInBand

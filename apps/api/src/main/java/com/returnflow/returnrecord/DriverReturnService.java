@@ -11,6 +11,7 @@ import com.returnflow.returnrecord.dto.CreateReturnRequest;
 import com.returnflow.returnrecord.dto.DriverSummaryResponse;
 import com.returnflow.returnrecord.dto.ReturnPhotoResponse;
 import com.returnflow.returnrecord.dto.ReturnResponse;
+import com.returnflow.returnrecord.dto.ReturnSignatureResponse;
 import com.returnflow.route.Route;
 import com.returnflow.route.dto.RouteSummaryResponse;
 import com.returnflow.tenant.Tenant;
@@ -40,13 +41,16 @@ class DriverReturnService {
 	private final ReturnRecordCreator returnRecordCreator;
 	private final ReturnRecordRepository returnRecordRepository;
 	private final ReturnPhotoRepository returnPhotoRepository;
+	private final ReturnSignatureRepository returnSignatureRepository;
 	private final UserRepository userRepository;
 
 	DriverReturnService(ReturnRecordCreator returnRecordCreator, ReturnRecordRepository returnRecordRepository,
-			ReturnPhotoRepository returnPhotoRepository, UserRepository userRepository) {
+			ReturnPhotoRepository returnPhotoRepository, ReturnSignatureRepository returnSignatureRepository,
+			UserRepository userRepository) {
 		this.returnRecordCreator = returnRecordCreator;
 		this.returnRecordRepository = returnRecordRepository;
 		this.returnPhotoRepository = returnPhotoRepository;
+		this.returnSignatureRepository = returnSignatureRepository;
 		this.userRepository = userRepository;
 	}
 
@@ -58,15 +62,18 @@ class DriverReturnService {
 				request.productName(), request.reason(), request.reasonDetails(), request.quantity(), request.unit(),
 				request.observation());
 		ReturnRecord created = returnRecordCreator.create(tenant, driver, newReturn);
-		// A brand-new return can never already have photos — no query needed.
-		return toResponse(created, List.of());
+		// A brand-new return can never already have photos or a signature —
+		// no query needed for either.
+		return toResponse(created, List.of(), null);
 	}
 
 	@Transactional(readOnly = true)
 	List<ReturnResponse> list(AuthenticatedPrincipal principal) {
 		UUID tenantId = TenantContext.get().getId();
 		return returnRecordRepository.findByTenantIdAndDriverIdOrderByCreatedAtDescIdDesc(tenantId, principal.userId())
-				.stream().map(returnRecord -> toResponse(returnRecord, photosFor(returnRecord, tenantId))).toList();
+				.stream()
+				.map(returnRecord -> toResponse(returnRecord, photosFor(returnRecord, tenantId), signatureFor(returnRecord, tenantId)))
+				.toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -75,12 +82,19 @@ class DriverReturnService {
 		ReturnRecord returnRecord = returnRecordRepository
 				.findByIdAndTenantIdAndDriverId(returnId, tenantId, principal.userId())
 				.orElseThrow(ReturnRecordNotFoundException::new);
-		return toResponse(returnRecord, photosFor(returnRecord, tenantId));
+		return toResponse(returnRecord, photosFor(returnRecord, tenantId), signatureFor(returnRecord, tenantId));
 	}
 
 	private List<ReturnPhotoResponse> photosFor(ReturnRecord returnRecord, UUID tenantId) {
 		return returnPhotoRepository.findByReturnRecordIdAndTenantIdOrderByPositionAsc(returnRecord.getId(), tenantId)
 				.stream().map(photo -> ReturnPhotoService.toResponse(returnRecord.getId(), photo)).toList();
+	}
+
+	/** {@code null} when the return has no signature yet — see {@link ReturnResponse}'s Javadoc on how clients read that. */
+	private ReturnSignatureResponse signatureFor(ReturnRecord returnRecord, UUID tenantId) {
+		return returnSignatureRepository.findByReturnRecordIdAndTenantId(returnRecord.getId(), tenantId)
+				.map(signature -> ReturnSignatureService.toResponse(returnRecord.getId(), signature))
+				.orElse(null);
 	}
 
 	/**
@@ -95,7 +109,7 @@ class DriverReturnService {
 				.orElseThrow(() -> new IllegalStateException("Authenticated driver not found."));
 	}
 
-	private static ReturnResponse toResponse(ReturnRecord returnRecord, List<ReturnPhotoResponse> photos) {
+	private static ReturnResponse toResponse(ReturnRecord returnRecord, List<ReturnPhotoResponse> photos, ReturnSignatureResponse signature) {
 		User driver = returnRecord.getDriver();
 		Route route = returnRecord.getRoute();
 		return new ReturnResponse(
@@ -112,6 +126,7 @@ class DriverReturnService {
 				new DriverSummaryResponse(driver.getId(), driver.getFullName()),
 				new RouteSummaryResponse(route.getId(), route.getCode(), route.getName(), route.isActive()),
 				photos,
+				signature,
 				returnRecord.getCreatedAt(),
 				returnRecord.getUpdatedAt());
 	}

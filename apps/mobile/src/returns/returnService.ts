@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 import { authorizedMultipartRequest, authorizedRequestJson } from '../api/apiClient';
 import type { NormalizedPhoto } from './photoNormalization';
-import type { CreateReturnPayload, ReturnPhoto, ReturnRecord } from './types';
+import type { CreateReturnPayload, CreateReturnSignaturePayload, ReturnPhoto, ReturnRecord, ReturnSignature } from './types';
 
 /** GET /api/v1/driver/returns — server-side tenant+driver scoping only; no client-side filtering. */
 export function listReturns(): Promise<ReturnRecord[]> {
@@ -55,6 +55,23 @@ export async function uploadReturnPhoto(returnId: string, photo: NormalizedPhoto
     } as unknown as Blob);
   }
   return authorizedMultipartRequest<ReturnPhoto>(`/api/v1/driver/returns/${encodeURIComponent(returnId)}/photos`, formData);
+}
+
+/**
+ * POST /api/v1/driver/returns/{returnId}/signature — payload is exactly
+ * `CreateReturnSignaturePayload` (signer name + normalized stroke points),
+ * never a client-generated image, Base64, storage key, or timestamp.
+ */
+export function createReturnSignature(returnId: string, payload: CreateReturnSignaturePayload): Promise<ReturnSignature> {
+  return authorizedRequestJson<ReturnSignature>(`/api/v1/driver/returns/${encodeURIComponent(returnId)}/signature`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+/** GET /api/v1/driver/returns/{returnId}/signature — 404 (via `ApiError`) when the return has no signature yet. */
+export function getReturnSignature(returnId: string): Promise<ReturnSignature> {
+  return authorizedRequestJson<ReturnSignature>(`/api/v1/driver/returns/${encodeURIComponent(returnId)}/signature`);
 }
 
 /**

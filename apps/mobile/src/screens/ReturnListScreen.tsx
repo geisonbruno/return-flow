@@ -87,6 +87,7 @@ export default function ReturnListScreen({ navigation }: Props) {
               <Text style={styles.meta}>{formatQuantityAndUnit(item.quantity, item.unit)}</Text>
               <Text style={styles.meta}>{REASON_LABELS[item.reason]}</Text>
               <Text style={styles.meta}>Photos: {item.photos.length}</Text>
+              <Text style={styles.meta}>Signature: {item.signature ? 'Captured' : 'Pending'}</Text>
             </View>
             <Text style={styles.date}>{formatDateTime(item.createdAt)}</Text>
           </Pressable>

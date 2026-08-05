@@ -66,7 +66,9 @@ describe('CreateReturnScreen', () => {
         observation: 'Box was open',
       }),
     );
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-123' }));
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-123', origin: 'created' }),
+    );
   });
 
   it('prevents a duplicate submission while the first one is still in flight', async () => {
@@ -87,7 +89,9 @@ describe('CreateReturnScreen', () => {
     fireEvent.press(screen.getByTestId('create-return-submit-button'));
 
     resolveCreate({ id: 'return-123' });
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-123' }));
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-123', origin: 'created' }),
+    );
     expect(createReturn).toHaveBeenCalledTimes(1);
   });
 

@@ -26,7 +26,7 @@ interface QueuedPhoto {
 }
 
 export default function AddReturnPhotosScreen({ navigation, route }: Props) {
-  const { returnId } = route.params;
+  const { returnId, origin } = route.params;
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -171,9 +171,17 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
     [queue, uploadQueuedPhoto],
   );
 
-  const goToDetails = useCallback(() => {
-    navigation.replace('ReturnDetails', { returnId });
-  }, [navigation, returnId]);
+  // `origin` makes the destination explicit rather than inferred from
+  // navigation history: the primary new-return flow ('created') still needs
+  // the customer signature next, while the secondary "add more photos
+  // later" flow from Return Details ('details') just returns there.
+  const finish = useCallback(() => {
+    if (origin === 'created') {
+      navigation.replace('CustomerSignature', { returnId });
+    } else {
+      navigation.replace('ReturnDetails', { returnId });
+    }
+  }, [navigation, origin, returnId]);
 
   if (loading) {
     return (
@@ -202,7 +210,11 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.subtitle}>Your return has been created. Add photos now, or skip and add them later.</Text>
+        <Text style={styles.subtitle}>
+          {origin === 'created'
+            ? 'Your return has been created. Add photos now, or skip and add them later.'
+            : 'Add more photos to this return, or go back when you’re done.'}
+        </Text>
         <Text style={styles.countLabel} testID="photo-count">
           {uploadedCount} of {MAX_PHOTOS} photos uploaded
         </Text>
@@ -289,16 +301,16 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
         <View style={styles.footerRow}>
           <Pressable
             style={[styles.footerButton, uploadInProgress && styles.actionButtonDisabled]}
-            onPress={goToDetails}
+            onPress={finish}
             disabled={uploadInProgress}
             accessibilityRole="button"
             testID="skip-button"
           >
-            <Text style={styles.footerButtonLabel}>Skip for now</Text>
+            <Text style={styles.footerButtonLabel}>{origin === 'created' ? 'Skip for now' : 'Back'}</Text>
           </Pressable>
           <Pressable
             style={[styles.footerButton, styles.finishButton, hasIncompleteSelections && styles.actionButtonDisabled]}
-            onPress={goToDetails}
+            onPress={finish}
             disabled={hasIncompleteSelections}
             accessibilityRole="button"
             testID="finish-button"

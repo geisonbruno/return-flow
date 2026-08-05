@@ -74,7 +74,7 @@ export default function ReturnDetailsScreen({ navigation, route }: Props) {
             <Text style={styles.rowLabel}>Photos</Text>
             {record.photos.length < MAX_PHOTOS ? (
               <Pressable
-                onPress={() => navigation.navigate('AddReturnPhotos', { returnId: record.id })}
+                onPress={() => navigation.navigate('AddReturnPhotos', { returnId: record.id, origin: 'details' })}
                 accessibilityRole="button"
                 testID="add-photos-button"
               >
@@ -91,6 +91,32 @@ export default function ReturnDetailsScreen({ navigation, route }: Props) {
                   <Text style={styles.photoChipLabel}>Photo {photo.position}</Text>
                 </View>
               ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.photosSection}>
+          <Text style={styles.rowLabel}>Customer signature</Text>
+          {record.signature ? (
+            <View>
+              <Text style={styles.signatureStatusCaptured} testID="signature-status">
+                Captured
+              </Text>
+              <Text style={styles.signatureDetailText}>{record.signature.signerName}</Text>
+              <Text style={styles.signatureDetailText}>{formatDateTime(record.signature.signedAt)}</Text>
+            </View>
+          ) : (
+            <View>
+              <Text style={styles.signatureStatusPending} testID="signature-status">
+                Pending
+              </Text>
+              <Pressable
+                onPress={() => navigation.navigate('CustomerSignature', { returnId: record.id })}
+                accessibilityRole="button"
+                testID="capture-signature-button"
+              >
+                <Text style={styles.addPhotosLabel}>Capture customer signature</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -179,6 +205,32 @@ const styles = StyleSheet.create({
   },
   photoChipLabel: {
     fontSize: 13,
+    color: '#374151',
+  },
+  signatureStatusPending: {
+    alignSelf: 'flex-start',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B45309',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  signatureStatusCaptured: {
+    alignSelf: 'flex-start',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#166534',
+    backgroundColor: '#DCFCE7',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  signatureDetailText: {
+    fontSize: 14,
     color: '#374151',
   },
 });

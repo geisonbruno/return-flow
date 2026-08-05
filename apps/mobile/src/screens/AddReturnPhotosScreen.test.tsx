@@ -26,10 +26,10 @@ jest.mock('../returns/returnService', () => ({
 const ASSET = { uri: 'file:///picked.jpg', width: 1200, height: 900 };
 const NORMALIZED = { uri: 'file:///normalized.jpg', width: 1200, height: 900, contentType: 'image/jpeg' as const, sizeBytes: 1000 };
 
-function buildProps(returnId = 'return-1') {
+function buildProps(returnId = 'return-1', origin: 'created' | 'details' = 'details') {
   return {
     navigation: { replace: jest.fn(), navigate: jest.fn() },
-    route: { params: { returnId } },
+    route: { params: { returnId, origin } },
   };
 }
 
@@ -45,16 +45,35 @@ describe('AddReturnPhotosScreen', () => {
     (uploadReturnPhoto as jest.Mock).mockResolvedValue({ id: 'photo-1', contentType: 'image/jpeg', sizeBytes: 1000, position: 1, contentPath: '/x', createdAt: '' });
   });
 
-  it('renders the current uploaded photo count', async () => {
-    (listReturnPhotos as jest.Mock).mockResolvedValue([
-      { id: 'p1', contentType: 'image/jpeg', sizeBytes: 1, position: 1, contentPath: '/x', createdAt: '' },
-      { id: 'p2', contentType: 'image/jpeg', sizeBytes: 1, position: 2, contentPath: '/x', createdAt: '' },
-    ]);
-    render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
+  it(
+    'renders the current uploaded photo count',
+    async () => {
+      (listReturnPhotos as jest.Mock).mockResolvedValue([
+        { id: 'p1', contentType: 'image/jpeg', sizeBytes: 1, position: 1, contentPath: '/x', createdAt: '' },
+        { id: 'p2', contentType: 'image/jpeg', sizeBytes: 1, position: 2, contentPath: '/x', createdAt: '' },
+      ]);
+      render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
 
-    await waitFor(() => expect(screen.getByTestId('photo-count')).toBeTruthy());
-    expect(screen.getByTestId('photo-count').props.children.join('')).toBe('2 of 5 photos uploaded');
-  });
+      // This is the first render() in the file, so it alone pays a one-time
+      // React Native native-mock/module initialization cost that later tests
+      // in this file never pay again — on constrained GitHub-hosted CI
+      // runners that cost can occasionally exceed Jest's default 5000ms
+      // waitFor/test window even though the screen's own loading-to-ready
+      // transition is fast and correct. A longer timeout here (both on the
+      // wait and on the test itself) is the correct remedy for a slow first
+      // mount, not a synchronization bug — see the identical, previously
+      // fixed pattern in ReturnListScreen.test.tsx.
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('photo-count')).toBeTruthy();
+        },
+        { timeout: 5000 },
+      );
+      expect(screen.getByTestId('photo-count').props.children.join('')).toBe('2 of 5 photos uploaded');
+      expect(screen.queryByText('Loading photos…')).toBeNull();
+    },
+    10000,
+  );
 
   it('requests media library permission when adding from the library', async () => {
     render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
@@ -377,5 +396,35 @@ describe('AddReturnPhotosScreen', () => {
     expect(screen.getByTestId('add-from-library-button').props.accessibilityState.disabled).toBe(true);
     resolveNormalize(NORMALIZED);
     await waitFor(() => expect(uploadReturnPhoto).toHaveBeenCalled());
+  });
+
+  it('Skip navigates to Customer Signature, not Return Details, for a newly created return (origin: created)', async () => {
+    const props = buildProps('return-42', 'created');
+    render(<AddReturnPhotosScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('skip-button')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('skip-button'));
+
+    expect(props.navigation.replace).toHaveBeenCalledWith('CustomerSignature', { returnId: 'return-42' });
+  });
+
+  it('Finish navigates to Customer Signature, not Return Details, for a newly created return (origin: created)', async () => {
+    const props = buildProps('return-42', 'created');
+    render(<AddReturnPhotosScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('finish-button')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('finish-button'));
+
+    expect(props.navigation.replace).toHaveBeenCalledWith('CustomerSignature', { returnId: 'return-42' });
+  });
+
+  it('Finish navigates back to Return Details, not Customer Signature, when adding photos from Return Details (origin: details)', async () => {
+    const props = buildProps('return-42', 'details');
+    render(<AddReturnPhotosScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('finish-button')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('finish-button'));
+
+    expect(props.navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-42' });
   });
 });

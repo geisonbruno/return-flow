@@ -102,6 +102,53 @@ describe('ReturnListScreen', () => {
     expect(screen.getByText('Photos: 0')).toBeTruthy();
   });
 
+  it('shows a Signature indicator distinguishing captured from pending returns', async () => {
+    (listReturns as jest.Mock).mockResolvedValue([
+      {
+        id: '2',
+        returnNumber: 'RF-000002',
+        customerName: 'Signed Customer',
+        productName: 'Widget X200',
+        reason: 'DAMAGED',
+        reasonDetails: null,
+        quantity: 1,
+        unit: 'EA',
+        observation: 'obs',
+        status: 'AWAITING_WAREHOUSE',
+        driver: { id: 'd1', fullName: 'Driver One' },
+        route: { id: 'r1', code: 'R1', name: 'Route One', active: true },
+        photos: [],
+        signature: { id: 'sig-1', signerName: 'Jane Doe', contentType: 'image/svg+xml', sizeBytes: 500, contentPath: '/x', signedAt: '' },
+        createdAt: '2026-08-02T01:00:00.000Z',
+        updatedAt: '2026-08-02T01:00:00.000Z',
+      },
+      {
+        id: '1',
+        returnNumber: 'RF-000001',
+        customerName: 'Unsigned Customer',
+        productName: 'Gadget Y300',
+        reason: 'OTHER',
+        reasonDetails: 'Some detail',
+        quantity: 2,
+        unit: 'CTN',
+        observation: 'obs',
+        status: 'AWAITING_WAREHOUSE',
+        driver: { id: 'd1', fullName: 'Driver One' },
+        route: { id: 'r1', code: 'R1', name: 'Route One', active: true },
+        photos: [],
+        signature: null,
+        createdAt: '2026-08-01T01:00:00.000Z',
+        updatedAt: '2026-08-01T01:00:00.000Z',
+      },
+    ]);
+    const navigation = buildNavigation();
+
+    render(<ReturnListScreen navigation={navigation as any} route={{} as any} />);
+
+    await waitFor(() => expect(screen.getByText('Signature: Captured')).toBeTruthy());
+    expect(screen.getByText('Signature: Pending')).toBeTruthy();
+  });
+
   it('shows an error state with Retry, and Retry reloads the list', async () => {
     (listReturns as jest.Mock).mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce([]);
     const navigation = buildNavigation();

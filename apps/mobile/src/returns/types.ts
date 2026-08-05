@@ -47,6 +47,39 @@ export interface ReturnPhoto {
   createdAt: string;
 }
 
+/**
+ * Matches `returnrecord.dto.ReturnSignatureResponse` exactly — public
+ * metadata only. No storageKey, tenantId, driverId, raw strokes, or the
+ * generated SVG: `contentPath` is an API-relative path resolved against the
+ * app's own configured API base URL, mirroring {@link ReturnPhoto.contentPath}.
+ */
+export interface ReturnSignature {
+  id: string;
+  signerName: string;
+  contentType: string;
+  sizeBytes: number;
+  contentPath: string;
+  signedAt: string;
+}
+
+/** One already-captured stroke point, normalized to the signature pad's own bounds — 0..1 on both axes, independent of the pad's actual pixel size. */
+export interface SignaturePoint {
+  x: number;
+  y: number;
+}
+
+export type SignatureStroke = SignaturePoint[];
+
+/**
+ * Matches `returnrecord.dto.CreateReturnSignatureRequest` exactly. Never
+ * includes tenantId, driverId, signedAt, storageKey, SVG, Base64, or return
+ * status — only the signer's name and the normalized stroke geometry itself.
+ */
+export interface CreateReturnSignaturePayload {
+  signerName: string;
+  strokes: SignatureStroke[];
+}
+
 /** Matches `returnrecord.dto.ReturnResponse` exactly — the driver API's response contract. */
 export interface ReturnRecord {
   id: string;
@@ -63,6 +96,8 @@ export interface ReturnRecord {
   route: RouteSummary;
   /** Always an array — empty right after creation, never null. */
   photos: ReturnPhoto[];
+  /** `null` until the driver captures the customer signature — clients read "pending" from this nullability rather than a separate boolean flag. */
+  signature: ReturnSignature | null;
   createdAt: string;
   updatedAt: string;
 }

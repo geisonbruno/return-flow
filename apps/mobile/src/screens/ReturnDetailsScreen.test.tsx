@@ -98,7 +98,7 @@ describe('ReturnDetailsScreen', () => {
 
     fireEvent.press(screen.getByTestId('add-photos-button'));
 
-    expect(props.navigation.navigate).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-1' });
+    expect(props.navigation.navigate).toHaveBeenCalledWith('AddReturnPhotos', { returnId: 'return-1', origin: 'details' });
   });
 
   it('hides Add photos once the return already has five photos', async () => {
@@ -118,5 +118,32 @@ describe('ReturnDetailsScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Photo 5')).toBeTruthy());
     expect(screen.queryByTestId('add-photos-button')).toBeNull();
+  });
+
+  it('shows Signature: Pending with a capture action when the return has no signature yet', async () => {
+    (getReturn as jest.Mock).mockResolvedValue(RECORD);
+    const props = buildProps('return-1');
+
+    render(<ReturnDetailsScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('signature-status')).toBeTruthy());
+
+    expect(screen.getByTestId('signature-status').props.children).toBe('Pending');
+    fireEvent.press(screen.getByTestId('capture-signature-button'));
+
+    expect(props.navigation.navigate).toHaveBeenCalledWith('CustomerSignature', { returnId: 'return-1' });
+  });
+
+  it('shows Signature: Captured with the signer name and no capture action once signed', async () => {
+    (getReturn as jest.Mock).mockResolvedValue({
+      ...RECORD,
+      signature: { id: 'sig-1', signerName: 'Jane Doe', contentType: 'image/svg+xml', sizeBytes: 500, contentPath: '/x', signedAt: '2026-08-03T00:02:00.000Z' },
+    });
+
+    render(<ReturnDetailsScreen {...(buildProps('return-1') as any)} />);
+
+    await waitFor(() => expect(screen.getByTestId('signature-status')).toBeTruthy());
+    expect(screen.getByTestId('signature-status').props.children).toBe('Captured');
+    expect(screen.getByText('Jane Doe')).toBeTruthy();
+    expect(screen.queryByTestId('capture-signature-button')).toBeNull();
   });
 });
