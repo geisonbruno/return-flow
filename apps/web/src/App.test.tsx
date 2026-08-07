@@ -26,7 +26,16 @@ const ADMIN_USER = {
   tenantName: 'Warehouse',
 };
 
-/** Stubs fetch to satisfy the restore-session flow (refresh + /auth/me), so tests can start already authenticated. */
+const EMPTY_PAGE = { content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 };
+
+/**
+ * Stubs fetch to satisfy the restore-session flow (refresh + /auth/me) plus
+ * the Dashboard's own data calls, so these routing regression tests render
+ * a realistic authenticated app instead of leaving Dashboard's queries to
+ * fail with "unexpected request" on every render that happens to land on
+ * `/dashboard`. Dashboard/Returns *behavior* itself is covered by their own
+ * dedicated test files, not here.
+ */
 function stubAuthenticatedFetch() {
   vi.stubGlobal(
     'fetch',
@@ -40,6 +49,12 @@ function stubAuthenticatedFetch() {
       }
       if (url.includes('/auth/logout')) {
         return new Response(null, { status: 204 });
+      }
+      if (url.includes('/admin/dashboard/summary')) {
+        return jsonResponse(200, { waitingWarehouse: 0, inReview: 0, closedToday: 0, returnsToday: 0 });
+      }
+      if (url.includes('/admin/returns')) {
+        return jsonResponse(200, EMPTY_PAGE);
       }
       throw new Error(`Unexpected request: ${url}`);
     }),
