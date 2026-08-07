@@ -1,12 +1,22 @@
-import './App.css'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter } from 'react-router-dom';
+
+import './App.css';
+import { AuthProvider } from './auth/AuthContext';
+import { AppRoutes } from './routes/AppRoutes';
+
+const queryClient = new QueryClient();
 
 function App() {
   return (
-    <main className="placeholder">
-      <h1>ReturnFlow</h1>
-      <p>Admin web console — scaffold in progress.</p>
-    </main>
-  )
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
 }
 
-export default App
+export default App;
