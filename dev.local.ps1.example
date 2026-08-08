@@ -1,0 +1,19 @@
+# Copy this file to dev.local.ps1 (repository root) to customize your local
+# .\dev.ps1 run. dev.local.ps1 is listed in .gitignore and must never be
+# committed — it is a per-developer file, not shared configuration.
+#
+# These three variables control the backend's first-admin bootstrap
+# (BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD / BOOTSTRAP_ADMIN_NAME).
+# Leave all three commented out (or the file absent) to disable bootstrap.
+# All three must be set together, or the backend fails fast at startup.
+#
+# The bootstrap is idempotent by normalized email: if an ADMIN with this
+# email already exists in your local database, changing
+# BOOTSTRAP_ADMIN_PASSWORD here later will NOT reset that admin's password.
+# Use a new email (or delete the local database) to provision a different
+# admin. This remains a local/first-admin provisioning mechanism only — it
+# is not, and must not become, a public signup endpoint.
+
+# $env:BOOTSTRAP_ADMIN_EMAIL = "admin@returnflow.local"
+# $env:BOOTSTRAP_ADMIN_PASSWORD = "CHANGE_ME"
+# $env:BOOTSTRAP_ADMIN_NAME = "ReturnFlow Admin"

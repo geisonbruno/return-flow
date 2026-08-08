@@ -76,6 +76,24 @@ Recommended rules for this solo-developed MVP (target branch: `main`):
 
 These settings have not been enabled as of this document. Treat this section as instructions for the next manual configuration step, not a record of what is already active.
 
+## Local Development Startup
+
+**First-time setup:** copy `dev.local.ps1.example` (repository root) to `dev.local.ps1` and set local bootstrap-admin values there if you want a first `ADMIN` provisioned automatically.
+
+**Daily startup**, from the repository root:
+
+```powershell
+.\dev.ps1
+```
+
+This starts PostgreSQL and MinIO (`docker compose -f infra/docker-compose.yml up -d`), runs the Spring Boot API locally (`apps/api`, `local` profile, via the Maven Wrapper — no globally installed Maven needed) in its own visible window, and runs the Vite dev server (`apps/web`) in its own visible window, so the developer never has to remember the separate Docker/Maven/npm commands individually.
+
+- `dev.local.ps1` is ignored by Git — bootstrap credentials (`BOOTSTRAP_ADMIN_EMAIL`/`PASSWORD`/`NAME`) are never source-controlled, and the script never prints `BOOTSTRAP_ADMIN_PASSWORD`.
+- The bootstrap is idempotent by normalized email: once an `ADMIN` with that email exists locally, changing `BOOTSTRAP_ADMIN_PASSWORD` later does not reset it. It remains a local/first-admin provisioning mechanism only, never a public signup endpoint.
+- An already-running ReturnFlow backend or web dev server is detected and reused, not duplicated.
+- If a required port (`8080` or `5173`) is occupied by something that isn't ReturnFlow, the script stops safely and reports it rather than killing that process or picking a different port.
+- `npm install` in `apps/web` (and any other first-time dependency install) remains a manual, one-time step — `dev.ps1` never installs dependencies.
+
 ## Release strategy
 
 - Individual phases and commits are **not** tagged. Phase numbers (e.g. "Phase 5A") are internal development milestones tracked in `PROGRESS.md`, not release identifiers.

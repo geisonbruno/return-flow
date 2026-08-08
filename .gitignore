@@ -5,6 +5,9 @@
 !.env.example
 infra/.env
 
+# Local dev-startup configuration (dev.ps1) — per-developer, never committed
+dev.local.ps1
+
 # Node
 node_modules/
 dist/
