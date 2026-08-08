@@ -1,5 +1,6 @@
-import { authorizedRequestJson } from '../api/apiClient';
-import type { AdminDashboardSummary, AdminReturnListItem, AdminRouteSummary, AdminUserSummary, PageResponse } from './types';
+import { authorizedRequestBlob, authorizedRequestJson } from '../api/apiClient';
+import { toApiRelativePath } from '../config/environment';
+import type { AdminDashboardSummary, AdminReturnDetail, AdminReturnListItem, AdminRouteSummary, AdminUserSummary, PageResponse } from './types';
 
 export function fetchDashboardSummary(): Promise<AdminDashboardSummary> {
   return authorizedRequestJson<AdminDashboardSummary>('/admin/dashboard/summary');
@@ -44,4 +45,13 @@ export function fetchUsers(): Promise<AdminUserSummary[]> {
 /** Read-only reuse of the existing ADMIN route list, for the Returns page's route filter dropdown only — no route administration here (Phase 8). */
 export function fetchRoutes(): Promise<AdminRouteSummary[]> {
   return authorizedRequestJson<AdminRouteSummary[]>('/admin/routes');
+}
+
+export function fetchReturnDetail(returnId: string): Promise<AdminReturnDetail> {
+  return authorizedRequestJson<AdminReturnDetail>(`/admin/returns/${returnId}`);
+}
+
+/** `contentPath` is a backend-provided `ReturnPhotoResponse`/`ReturnSignatureResponse` value — resolved before the request so it is never combined with the API base twice. */
+export function fetchMediaBlob(contentPath: string): Promise<Blob> {
+  return authorizedRequestBlob(toApiRelativePath(contentPath));
 }

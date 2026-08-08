@@ -81,3 +81,43 @@ export interface AdminRouteSummary {
   name: string;
   active: boolean;
 }
+
+/** Matches the backend's `returnrecord.dto.ReturnPhotoResponse`. `contentPath` already includes the API version prefix — see `config/environment.ts`'s `toApiRelativePath`. */
+export interface ReturnPhoto {
+  id: string;
+  contentType: string;
+  sizeBytes: number;
+  position: number;
+  contentPath: string;
+  createdAt: string;
+}
+
+/** Matches the backend's `returnrecord.dto.ReturnSignatureResponse`. */
+export interface ReturnSignature {
+  id: string;
+  signerName: string;
+  contentType: string;
+  sizeBytes: number;
+  contentPath: string;
+  signedAt: string;
+}
+
+/** Matches the backend's `returnrecord.dto.AdminReturnDetailResponse` (GET /admin/returns/{returnId}). No reviewer/warehouse/cancellation fields — none exist until Phase 7A. */
+export interface AdminReturnDetail {
+  id: string;
+  returnNumber: string;
+  status: ReturnStatus;
+  customerName: string;
+  productName: string;
+  quantity: number;
+  unit: ReturnUnit;
+  reason: ReturnReason;
+  reasonDetails: string | null;
+  observation: string | null;
+  driver: DriverSummary;
+  route: RouteSummary;
+  photos: ReturnPhoto[];
+  signature: ReturnSignature | null;
+  createdAt: string;
+  updatedAt: string;
+}

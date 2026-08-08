@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_FILTERS, filtersToSearchParams, hasActiveFilters, isInvalidDateRange, parseReturnsFilters, type ReturnsFilters } from './filters';
+import { EMPTY_FILTERS, filtersToSearchParams, hasActiveFilters, isInvalidDateRange, isValidUuid, parseReturnsFilters, type ReturnsFilters } from './filters';
+
+describe('isValidUuid', () => {
+  it('accepts a well-formed UUID', () => {
+    expect(isValidUuid('11111111-1111-1111-1111-111111111111')).toBe(true);
+  });
+
+  it('rejects a malformed value', () => {
+    expect(isValidUuid('not-a-uuid')).toBe(false);
+    expect(isValidUuid('12345')).toBe(false);
+    expect(isValidUuid('')).toBe(false);
+  });
+});
 
 describe('parseReturnsFilters', () => {
   it('defaults every field when the URL has no query string', () => {
