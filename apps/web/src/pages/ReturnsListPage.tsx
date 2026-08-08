@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 import { toSafeErrorMessage } from '../api/problemDetail';
 import { EmptyState } from '../components/EmptyState';
@@ -25,6 +25,7 @@ export function ReturnsListPage() {
   }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const filters = useMemo(() => parseReturnsFilters(searchParams), [searchParams]);
 
   // Uncommitted drafts for free-text/date inputs, so typing doesn't refetch
@@ -200,7 +201,7 @@ export function ReturnsListPage() {
         )
       ) : page ? (
         <>
-          <ReturnTable returns={page.content} />
+          <ReturnTable returns={page.content} backTo={`${location.pathname}${location.search}`} />
           <Pagination page={page.page} totalPages={page.totalPages} totalElements={page.totalElements} onPageChange={(nextPage) => applyFilters({ page: nextPage }, false)} />
         </>
       ) : null}

@@ -39,7 +39,12 @@ const VALID_REASONS: readonly ReturnReason[] = [
   'OTHER',
 ];
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Shared with `ReturnDetailsPage` — a route param that isn't a well-formed UUID is never sent to the API; it fails safe as "not found" immediately. */
+export function isValidUuid(value: string): boolean {
+  return UUID_PATTERN.test(value);
+}
 
 function sanitizeEnum<T extends string>(raw: string | null, valid: readonly T[]): T | '' {
   return raw !== null && (valid as readonly string[]).includes(raw) ? (raw as T) : '';

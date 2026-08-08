@@ -135,6 +135,19 @@ export function authorizedRequestJson<T>(path: string, options: RequestOptions =
   return authorizedRequest<T>(path, options);
 }
 
+/**
+ * Authenticated binary media fetch (return photos, the rendered customer
+ * signature) — shares the exact same bearer-token attachment and
+ * refresh-and-retry-once behavior as {@link authorizedRequestJson}, just
+ * reading the response body as a `Blob` instead of JSON. `path` must
+ * already be relative to the configured API base — resolve a
+ * backend-provided `contentPath` with `config/environment.ts`'s
+ * `toApiRelativePath` first.
+ */
+export function authorizedRequestBlob(path: string): Promise<Blob> {
+  return authorizedRequest<Blob>(path, { responseType: 'blob' });
+}
+
 /** Test-only: resets every module-level singleton so tests don't leak state into each other. */
 export function resetApiClientForTests(): void {
   accessToken = null;

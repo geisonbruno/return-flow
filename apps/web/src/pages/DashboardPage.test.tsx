@@ -170,6 +170,13 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Acme')).toBeInTheDocument();
   });
 
+  it('links the Latest Returns Return # to /returns/{id}', async () => {
+    stubFetch();
+    renderDashboard();
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'RF-000001' })).toHaveAttribute('href', '/returns/r1'));
+  });
+
   it('shows an empty message when no returns exist yet', async () => {
     stubFetch({ latest: jsonResponse(200, EMPTY_PAGE) });
     renderDashboard();

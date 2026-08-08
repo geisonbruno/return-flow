@@ -129,6 +129,13 @@ describe('ReturnsListPage', () => {
     expect(screen.getByText('Acme Ltd')).toBeInTheDocument();
   });
 
+  it('links the Return # to /returns/{id}, preserving the current filtered view as the "back" destination', async () => {
+    stubFetch(() => jsonResponse(200, makePage([makeReturn({ id: 'return-row-1', returnNumber: 'RF-000042' })])));
+    renderReturnsPage('/returns?status=AWAITING_WAREHOUSE');
+
+    await waitFor(() => expect(screen.getByRole('link', { name: 'RF-000042' })).toHaveAttribute('href', '/returns/return-row-1'));
+  });
+
   it('reads pagination fields from the PageResponse envelope', async () => {
     stubFetch(() => jsonResponse(200, makePage([makeReturn()], { page: 2, totalPages: 5, totalElements: 113 })));
     renderReturnsPage();

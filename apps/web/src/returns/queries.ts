@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
-import { fetchDashboardSummary, fetchReturns, fetchRoutes, fetchUsers, type ReturnListParams } from './api';
+import { fetchDashboardSummary, fetchMediaBlob, fetchReturnDetail, fetchReturns, fetchRoutes, fetchUsers, type ReturnListParams } from './api';
 
 /** Modest, per `apps/web/CLAUDE.md` ("simple polling is acceptable; WebSockets and browser push are not") — not real-time. */
 const DASHBOARD_REFETCH_INTERVAL_MS = 30_000;
@@ -73,5 +73,42 @@ export function useRouteOptions() {
     queryKey: routeOptionsQueryKey,
     queryFn: fetchRoutes,
     staleTime: FILTER_OPTIONS_STALE_TIME_MS,
+  });
+}
+
+export function returnDetailQueryKey(returnId: string) {
+  return ['admin', 'returns', 'detail', returnId] as const;
+}
+
+export function useReturnDetail(returnId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: returnDetailQueryKey(returnId),
+    queryFn: () => fetchReturnDetail(returnId),
+    enabled,
+  });
+}
+
+/**
+ * `contentPath` alone is a sufficient, globally unique cache key — it
+ * already embeds the return ID (and photo ID, for a photo), so media from
+ * one return can never collide with or be shown for another.
+ */
+export function mediaBlobQueryKey(contentPath: string) {
+  return ['admin', 'media', contentPath] as const;
+}
+
+/**
+ * `gcTime: 0` deliberately does not retain a fetched Blob in the query
+ * cache once nothing is displaying it — these are private, potentially
+ * multi-megabyte photo/signature bytes, unlike the small JSON queries
+ * elsewhere in this module, which keep TanStack Query's normal defaults.
+ */
+export function useMediaBlob(contentPath: string | null | undefined) {
+  return useQuery({
+    queryKey: mediaBlobQueryKey(contentPath ?? ''),
+    queryFn: () => fetchMediaBlob(contentPath as string),
+    enabled: Boolean(contentPath),
+    gcTime: 0,
+    staleTime: 0,
   });
 }
