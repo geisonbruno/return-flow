@@ -92,7 +92,8 @@ class DriverReturnService {
 
 	/** {@code null} when the return has no signature yet — see {@link ReturnResponse}'s Javadoc on how clients read that. */
 	private ReturnSignatureResponse signatureFor(ReturnRecord returnRecord, UUID tenantId) {
-		return returnSignatureRepository.findByReturnRecordIdAndTenantId(returnRecord.getId(), tenantId)
+		return returnSignatureRepository
+				.findByReturnRecordIdAndTenantIdAndSignatureType(returnRecord.getId(), tenantId, SignatureType.CUSTOMER)
 				.map(signature -> ReturnSignatureService.toResponse(returnRecord.getId(), signature))
 				.orElse(null);
 	}

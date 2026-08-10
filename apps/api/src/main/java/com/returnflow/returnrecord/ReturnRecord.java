@@ -1,5 +1,6 @@
 package com.returnflow.returnrecord;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import com.returnflow.common.audit.Auditable;
 import com.returnflow.route.Route;
@@ -38,8 +40,22 @@ import com.returnflow.user.User;
  * reassignment never rewrites history (see that class's Javadoc).
  *
  * <p>{@code quantity}, {@code unit}, and {@code reasonDetails} are set once
- * at creation and, like every other field here, have no mutator — this
- * phase implements no update/edit endpoint.
+ * at creation and have no mutator — this phase implements no driver
+ * update/edit endpoint. The Phase 7A warehouse-review fields below
+ * ({@code reviewStartedBy} onward) are mutated only through
+ * {@code AdminReturnReviewService}'s dedicated lifecycle methods, each
+ * called only after that service has already verified the current status,
+ * tenant, and (where relevant) review ownership under a pessimistic row
+ * lock (see {@code ReturnRecordRepository.findByIdAndTenantIdForUpdate}) —
+ * the same "serialize concurrent mutation of one return" pattern
+ * {@code ReturnPhotoService}/{@code ReturnSignatureService} already use for
+ * photo/signature uploads. {@code version} is an additional optimistic-lock
+ * backstop (root {@code CLAUDE.md} §25) beneath that pessimistic lock, not a
+ * replacement for it. Reviewer/closer/canceller are stored as raw
+ * {@code UUID} columns, not {@code @ManyToOne} associations — unlike
+ * {@code tenant}/{@code driver}/{@code route} above, these are optional,
+ * populated well after creation, and don't need the three-aggregate-roots
+ * justification that motivated those associations.
  */
 @Entity
 @Table(name = "return_record")
@@ -95,6 +111,46 @@ public class ReturnRecord extends Auditable {
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 30)
 	private ReturnStatus status;
+
+	@Version
+	@Column(nullable = false)
+	private long version;
+
+	@Column(name = "review_started_by")
+	private UUID reviewStartedBy;
+
+	@Column(name = "review_started_at")
+	private Instant reviewStartedAt;
+
+	@Column
+	private Boolean sellable;
+
+	@Column(name = "credit_customer")
+	private Boolean creditCustomer;
+
+	@Column(name = "charge_customer")
+	private Boolean chargeCustomer;
+
+	@Column(name = "charge_driver")
+	private Boolean chargeDriver;
+
+	@Column(name = "warehouse_observation", length = 2000)
+	private String warehouseObservation;
+
+	@Column(name = "closed_by")
+	private UUID closedBy;
+
+	@Column(name = "closed_at")
+	private Instant closedAt;
+
+	@Column(name = "cancelled_by")
+	private UUID cancelledBy;
+
+	@Column(name = "cancelled_at")
+	private Instant cancelledAt;
+
+	@Column(name = "cancellation_reason", length = 500)
+	private String cancellationReason;
 
 	protected ReturnRecord() {
 		// JPA
@@ -166,5 +222,103 @@ public class ReturnRecord extends Auditable {
 
 	public ReturnStatus getStatus() {
 		return status;
+	}
+
+	public long getVersion() {
+		return version;
+	}
+
+	public UUID getReviewStartedBy() {
+		return reviewStartedBy;
+	}
+
+	public Instant getReviewStartedAt() {
+		return reviewStartedAt;
+	}
+
+	public Boolean getSellable() {
+		return sellable;
+	}
+
+	public Boolean getCreditCustomer() {
+		return creditCustomer;
+	}
+
+	public Boolean getChargeCustomer() {
+		return chargeCustomer;
+	}
+
+	public Boolean getChargeDriver() {
+		return chargeDriver;
+	}
+
+	public String getWarehouseObservation() {
+		return warehouseObservation;
+	}
+
+	public UUID getClosedBy() {
+		return closedBy;
+	}
+
+	public Instant getClosedAt() {
+		return closedAt;
+	}
+
+	public UUID getCancelledBy() {
+		return cancelledBy;
+	}
+
+	public Instant getCancelledAt() {
+		return cancelledAt;
+	}
+
+	public String getCancellationReason() {
+		return cancellationReason;
+	}
+
+	/** Called only by {@code AdminReturnReviewService} after it has already verified the return is {@code AWAITING_WAREHOUSE}. */
+	void startReview(UUID adminId) {
+		this.status = ReturnStatus.IN_REVIEW;
+		this.reviewStartedBy = adminId;
+		this.reviewStartedAt = Instant.now();
+	}
+
+	/** Called only by {@code AdminReturnReviewService} after it has already verified the caller is the current review owner. No warehouse field is touched — nothing was ever persisted to release. */
+	void releaseReview() {
+		this.status = ReturnStatus.AWAITING_WAREHOUSE;
+		this.reviewStartedBy = null;
+		this.reviewStartedAt = null;
+	}
+
+	/**
+	 * Reassigns review ownership without changing {@code status} (already
+	 * {@code IN_REVIEW}). Deliberately the smallest durable audit trail for a
+	 * takeover — updating these two fields again, not a separate event/history
+	 * table — per this phase's explicit "do not build event sourcing" scope.
+	 */
+	void takeOverReview(UUID adminId) {
+		this.reviewStartedBy = adminId;
+		this.reviewStartedAt = Instant.now();
+	}
+
+	/** Called only by {@code AdminReturnReviewService} after it has already verified review ownership and validated every required field and the warehouse signature. */
+	void close(boolean sellable, boolean creditCustomer, boolean chargeCustomer, boolean chargeDriver,
+			String warehouseObservation, UUID adminId) {
+		this.status = ReturnStatus.CLOSED;
+		this.sellable = sellable;
+		this.creditCustomer = creditCustomer;
+		this.chargeCustomer = chargeCustomer;
+		this.chargeDriver = chargeDriver;
+		this.warehouseObservation = warehouseObservation;
+		this.closedBy = adminId;
+		this.closedAt = Instant.now();
+	}
+
+	/** Called only by {@code AdminReturnReviewService} after it has already verified the return is cancellable. Reviewer fields, if set, are left as the historical record of who was reviewing at the time — this is cancellation, not deletion. */
+	void cancel(UUID adminId, String reason) {
+		this.status = ReturnStatus.CANCELLED;
+		this.cancelledBy = adminId;
+		this.cancelledAt = Instant.now();
+		this.cancellationReason = reason;
 	}
 }

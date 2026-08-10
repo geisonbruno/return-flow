@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ReturnSignatureRepository extends JpaRepository<ReturnSignature, UUID> {
 
-	Optional<ReturnSignature> findByReturnRecordIdAndTenantId(UUID returnRecordId, UUID tenantId);
+	Optional<ReturnSignature> findByReturnRecordIdAndTenantIdAndSignatureType(UUID returnRecordId, UUID tenantId, SignatureType signatureType);
 
-	boolean existsByReturnRecordId(UUID returnRecordId);
+	boolean existsByReturnRecordIdAndSignatureType(UUID returnRecordId, SignatureType signatureType);
 }

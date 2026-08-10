@@ -48,6 +48,9 @@ class ReturnPhotoService {
 		ReturnRecord returnRecord = returnRecordRepository
 				.findByIdAndTenantIdAndDriverIdForUpdate(returnId, tenantId, principal.userId())
 				.orElseThrow(ReturnRecordNotFoundException::new);
+		if (returnRecord.getStatus() != ReturnStatus.AWAITING_WAREHOUSE) {
+			throw new ReturnNotEditableException();
+		}
 
 		byte[] content = readAndValidate(file);
 

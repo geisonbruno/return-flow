@@ -30,6 +30,37 @@ class AdminReturnExceptionHandler {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid Page Request", "Page must be zero or greater, and size must be between 1 and 100.");
 	}
 
+	@ExceptionHandler(InvalidReturnLifecycleException.class)
+	ProblemDetail handleInvalidReturnLifecycle(InvalidReturnLifecycleException ex) {
+		return problem(HttpStatus.CONFLICT, "Invalid Return State", ex.getMessage());
+	}
+
+	@ExceptionHandler(ReviewAlreadyClaimedException.class)
+	ProblemDetail handleReviewAlreadyClaimed(ReviewAlreadyClaimedException ex) {
+		return reviewerConflict(HttpStatus.CONFLICT, "Return Already In Review",
+				"Another admin already started reviewing this return.", ex.getCurrentReviewerName());
+	}
+
+	@ExceptionHandler(ReviewOwnershipConflictException.class)
+	ProblemDetail handleReviewOwnershipConflict(ReviewOwnershipConflictException ex) {
+		return reviewerConflict(HttpStatus.CONFLICT, "Review Ownership Conflict",
+				"Only the current reviewer can perform this action.", ex.getCurrentReviewerName());
+	}
+
+	@ExceptionHandler(StaleTakeoverException.class)
+	ProblemDetail handleStaleTakeover(StaleTakeoverException ex) {
+		return reviewerConflict(HttpStatus.CONFLICT, "Stale Takeover",
+				"The current reviewer has changed since this was last observed.", ex.getCurrentReviewerName());
+	}
+
+	private static ProblemDetail reviewerConflict(HttpStatus status, String title, String detail, String currentReviewerName) {
+		ProblemDetail problem = problem(status, title, detail);
+		if (currentReviewerName != null) {
+			problem.setProperty("currentReviewerName", currentReviewerName);
+		}
+		return problem;
+	}
+
 	@ExceptionHandler(InvalidReturnFilterException.class)
 	ProblemDetail handleInvalidReturnFilter() {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid Filter",
