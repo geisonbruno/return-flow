@@ -10,12 +10,12 @@ import com.returnflow.route.dto.RouteSummaryResponse;
 
 /**
  * One row of the ADMIN returns list ({@code docs/WEB_UX.md} §6's minimum
- * table columns). No reviewer or review-timestamp field: the domain has no
- * such data until Phase 7A, and a field that is always {@code null} with no
- * real backing concept would misrepresent what this phase actually
- * delivers — see {@code PROGRESS.md} Known issues. {@code photoCount} and
- * {@code hasSignature} give the same lightweight media-presence signal the
- * mobile app already shows on My Returns, without embedding any media
+ * table columns). {@code reviewer} is {@code null} until a review has
+ * started (root {@code CLAUDE.md} §17.2's "reviewer (when in review or
+ * closed)" column) and remains set after {@code CLOSED} — a return
+ * cancelled before any review starts keeps it {@code null}. {@code photoCount}
+ * and {@code hasSignature} give the same lightweight media-presence signal
+ * the mobile app already shows on My Returns, without embedding any media
  * content or metadata here.
  */
 public record AdminReturnListItemResponse(
@@ -29,6 +29,7 @@ public record AdminReturnListItemResponse(
 		ReturnStatus status,
 		DriverSummaryResponse driver,
 		RouteSummaryResponse route,
+		AdminSummaryResponse reviewer,
 		Instant createdAt,
 		int photoCount,
 		boolean hasSignature) {

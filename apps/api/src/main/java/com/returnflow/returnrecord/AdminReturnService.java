@@ -18,19 +18,14 @@ import com.returnflow.common.web.PageResponse;
 import com.returnflow.returnrecord.dto.AdminReturnDetailResponse;
 import com.returnflow.returnrecord.dto.AdminReturnListItemResponse;
 import com.returnflow.returnrecord.dto.AdminReturnSummaryResponse;
-import com.returnflow.returnrecord.dto.DriverSummaryResponse;
-import com.returnflow.returnrecord.dto.ReturnPhotoResponse;
-import com.returnflow.returnrecord.dto.ReturnSignatureResponse;
-import com.returnflow.route.Route;
-import com.returnflow.route.dto.RouteSummaryResponse;
 import com.returnflow.tenant.TenantContext;
-import com.returnflow.user.User;
 
 /**
- * Read-only ADMIN return queries (Phase 6A) — tenant scoping always from
+ * Read-only ADMIN return queries — tenant scoping always from
  * {@link TenantContext}, mirroring every other ADMIN/DRIVER service in this
- * codebase. No mutation of any kind: Phase 6A ships no Start Review, Close,
- * Cancel, or any other write endpoint (Phase 7A).
+ * codebase. No mutation of any kind: lifecycle transitions (Start Review,
+ * Release, Take Over, Close, Cancel) live in {@code AdminReturnReviewService}
+ * (Phase 7A).
  */
 @Service
 class AdminReturnService {
@@ -39,30 +34,26 @@ class AdminReturnService {
 	private static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
 
 	private final ReturnRecordRepository returnRecordRepository;
-	private final ReturnPhotoRepository returnPhotoRepository;
-	private final ReturnSignatureRepository returnSignatureRepository;
 	private final OperationalDayService operationalDayService;
+	private final AdminReturnMapper adminReturnMapper;
 
-	AdminReturnService(ReturnRecordRepository returnRecordRepository, ReturnPhotoRepository returnPhotoRepository,
-			ReturnSignatureRepository returnSignatureRepository, OperationalDayService operationalDayService) {
+	AdminReturnService(ReturnRecordRepository returnRecordRepository, OperationalDayService operationalDayService,
+			AdminReturnMapper adminReturnMapper) {
 		this.returnRecordRepository = returnRecordRepository;
-		this.returnPhotoRepository = returnPhotoRepository;
-		this.returnSignatureRepository = returnSignatureRepository;
 		this.operationalDayService = operationalDayService;
+		this.adminReturnMapper = adminReturnMapper;
 	}
 
-	/**
-	 * {@code inReview} and {@code closedToday} are always {@code 0} — see
-	 * {@link AdminReturnSummaryResponse}'s Javadoc. Only {@code waitingWarehouse}
-	 * and {@code returnsToday} reflect real domain data today.
-	 */
 	@Transactional(readOnly = true)
 	AdminReturnSummaryResponse summary() {
 		UUID tenantId = TenantContext.get().getId();
 		long waitingWarehouse = returnRecordRepository.countByTenantIdAndStatus(tenantId, ReturnStatus.AWAITING_WAREHOUSE);
+		long inReview = returnRecordRepository.countByTenantIdAndStatus(tenantId, ReturnStatus.IN_REVIEW);
+		long closedToday = returnRecordRepository.countByTenantIdAndStatusAndClosedAtGreaterThanEqualAndClosedAtLessThan(
+				tenantId, ReturnStatus.CLOSED, operationalDayService.startOfToday(), operationalDayService.endOfToday());
 		long returnsToday = returnRecordRepository.countByTenantIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
 				tenantId, operationalDayService.startOfToday(), operationalDayService.endOfToday());
-		return new AdminReturnSummaryResponse((int) waitingWarehouse, 0, 0, (int) returnsToday);
+		return new AdminReturnSummaryResponse((int) waitingWarehouse, (int) inReview, (int) closedToday, (int) returnsToday);
 	}
 
 	@Transactional(readOnly = true)
@@ -93,7 +84,8 @@ class AdminReturnService {
 
 		Pageable pageable = PageRequest.of(query.page(), query.size(), DEFAULT_SORT);
 		org.springframework.data.domain.Page<ReturnRecord> page = returnRecordRepository.findAll(spec, pageable);
-		List<AdminReturnListItemResponse> content = page.getContent().stream().map(this::toListItem).toList();
+		List<AdminReturnListItemResponse> content = page.getContent().stream()
+				.map(returnRecord -> adminReturnMapper.toListItem(returnRecord, tenantId)).toList();
 		return new PageResponse<>(content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
 	}
 
@@ -102,7 +94,7 @@ class AdminReturnService {
 		UUID tenantId = TenantContext.get().getId();
 		ReturnRecord returnRecord = returnRecordRepository.findByIdAndTenantId(returnId, tenantId)
 				.orElseThrow(ReturnRecordNotFoundException::new);
-		return toDetail(returnRecord, tenantId);
+		return adminReturnMapper.toDetail(returnRecord, tenantId);
 	}
 
 	/**
@@ -173,66 +165,4 @@ class AdminReturnService {
 		}
 	}
 
-	private AdminReturnListItemResponse toListItem(ReturnRecord returnRecord) {
-		int photoCount = returnPhotoRepository.countByReturnRecordId(returnRecord.getId());
-		boolean hasSignature = returnSignatureRepository.existsByReturnRecordId(returnRecord.getId());
-		User driver = returnRecord.getDriver();
-		Route route = returnRecord.getRoute();
-		return new AdminReturnListItemResponse(
-				returnRecord.getId(),
-				returnRecord.getReturnNumber(),
-				returnRecord.getCustomerName(),
-				returnRecord.getProductName(),
-				returnRecord.getQuantity(),
-				returnRecord.getUnit(),
-				returnRecord.getReason(),
-				returnRecord.getStatus(),
-				new DriverSummaryResponse(driver.getId(), driver.getFullName()),
-				new RouteSummaryResponse(route.getId(), route.getCode(), route.getName(), route.isActive()),
-				returnRecord.getCreatedAt(),
-				photoCount,
-				hasSignature);
-	}
-
-	private AdminReturnDetailResponse toDetail(ReturnRecord returnRecord, UUID tenantId) {
-		User driver = returnRecord.getDriver();
-		Route route = returnRecord.getRoute();
-		List<ReturnPhotoResponse> photos = returnPhotoRepository
-				.findByReturnRecordIdAndTenantIdOrderByPositionAsc(returnRecord.getId(), tenantId)
-				.stream().map(photo -> toAdminPhotoResponse(returnRecord.getId(), photo)).toList();
-		ReturnSignatureResponse signature = returnSignatureRepository
-				.findByReturnRecordIdAndTenantId(returnRecord.getId(), tenantId)
-				.map(sig -> toAdminSignatureResponse(returnRecord.getId(), sig))
-				.orElse(null);
-		return new AdminReturnDetailResponse(
-				returnRecord.getId(),
-				returnRecord.getReturnNumber(),
-				returnRecord.getStatus(),
-				returnRecord.getCustomerName(),
-				returnRecord.getProductName(),
-				returnRecord.getQuantity(),
-				returnRecord.getUnit(),
-				returnRecord.getReason(),
-				returnRecord.getReasonDetails(),
-				returnRecord.getObservation(),
-				new DriverSummaryResponse(driver.getId(), driver.getFullName()),
-				new RouteSummaryResponse(route.getId(), route.getCode(), route.getName(), route.isActive()),
-				photos,
-				signature,
-				returnRecord.getCreatedAt(),
-				returnRecord.getUpdatedAt());
-	}
-
-	/** ADMIN-scoped content path — deliberately not {@code ReturnPhotoService.toResponse}, which hardcodes the DRIVER-only path. */
-	private static ReturnPhotoResponse toAdminPhotoResponse(UUID returnId, ReturnPhoto photo) {
-		String contentPath = "/api/v1/admin/returns/%s/photos/%s/content".formatted(returnId, photo.getId());
-		return new ReturnPhotoResponse(photo.getId(), photo.getContentType(), photo.getSizeBytes(), photo.getPosition(), contentPath, photo.getCreatedAt());
-	}
-
-	/** ADMIN-scoped content path — deliberately not {@code ReturnSignatureService.toResponse}, which hardcodes the DRIVER-only path. */
-	private static ReturnSignatureResponse toAdminSignatureResponse(UUID returnId, ReturnSignature signature) {
-		String contentPath = "/api/v1/admin/returns/%s/signature/content".formatted(returnId);
-		return new ReturnSignatureResponse(signature.getId(), signature.getSignerName(), signature.getContentType(),
-				signature.getSizeBytes(), contentPath, signature.getSignedAt());
-	}
 }

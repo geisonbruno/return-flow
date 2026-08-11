@@ -105,10 +105,14 @@ class AdminReturnIntegrationTest {
 	// --- Summary ---
 
 	@Test
-	void summaryReportsWaitingWarehouseAndReturnsTodayWithHonestZerosForNotYetImplementedStates() throws Exception {
+	void summaryReportsWaitingWarehouseAndReturnsTodayAndZeroInReviewAndClosedTodayWhenNoneAreInReviewOrClosed() throws Exception {
 		createReturn(driverToken, "Customer A", "Product A");
 		createReturn(driverToken, "Customer B", "Product B");
 
+		// inReview/closedToday now reflect real domain data (Phase 7A) — see
+		// AdminReturnReviewIntegrationTest for coverage of both becoming
+		// non-zero after Start Review/Close. Neither return here ever enters
+		// those states, so both are a genuine zero, not a placeholder.
 		mockMvc.perform(get("/api/v1/admin/dashboard/summary").header(HttpHeaders.AUTHORIZATION, adminToken))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.waitingWarehouse").value(2))

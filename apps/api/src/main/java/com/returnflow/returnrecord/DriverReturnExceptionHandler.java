@@ -38,6 +38,11 @@ class DriverReturnExceptionHandler {
 		return problem(HttpStatus.NOT_FOUND, "Return Not Found", "Return not found.");
 	}
 
+	@ExceptionHandler(ReturnNotEditableException.class)
+	ProblemDetail handleReturnNotEditable() {
+		return problem(HttpStatus.CONFLICT, "Return Not Editable", "This return can no longer be edited because warehouse review has started or it is already closed or cancelled.");
+	}
+
 	@ExceptionHandler(InvalidReasonException.class)
 	ProblemDetail handleInvalidReason() {
 		return problem(HttpStatus.BAD_REQUEST, "Invalid Reason", "A return reason is required.");

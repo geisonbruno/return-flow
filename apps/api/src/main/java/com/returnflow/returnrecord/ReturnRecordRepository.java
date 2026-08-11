@@ -19,11 +19,14 @@ public interface ReturnRecordRepository extends JpaRepository<ReturnRecord, UUID
 
 	Optional<ReturnRecord> findByReturnNumberAndTenantId(String returnNumber, UUID tenantId);
 
-	/** Used by {@code AdminReturnService} for the "Waiting Warehouse" / future status-based dashboard cards. */
+	/** Used by {@code AdminReturnService} for the "Waiting Warehouse" and "In Review" status-based dashboard cards. */
 	long countByTenantIdAndStatus(UUID tenantId, ReturnStatus status);
 
 	/** Used by {@code AdminReturnService} for the "Returns Today" dashboard card — {@code from} inclusive, {@code to} exclusive. */
 	long countByTenantIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(UUID tenantId, Instant from, Instant to);
+
+	/** Used by {@code AdminReturnService} for the "Closed Today" dashboard card — {@code from} inclusive, {@code to} exclusive. */
+	long countByTenantIdAndStatusAndClosedAtGreaterThanEqualAndClosedAtLessThan(UUID tenantId, ReturnStatus status, Instant from, Instant to);
 
 	/** Newest first, with {@code id} as a stable tiebreaker for returns created in the same instant. */
 	List<ReturnRecord> findByTenantIdAndDriverIdOrderByCreatedAtDescIdDesc(UUID tenantId, UUID driverId);
@@ -43,4 +46,18 @@ public interface ReturnRecordRepository extends JpaRepository<ReturnRecord, UUID
 	@Query("select r from ReturnRecord r where r.id = :id and r.tenant.id = :tenantId and r.driver.id = :driverId")
 	Optional<ReturnRecord> findByIdAndTenantIdAndDriverIdForUpdate(
 			@Param("id") UUID id, @Param("tenantId") UUID tenantId, @Param("driverId") UUID driverId);
+
+	/**
+	 * Row-locking variant used by {@code AdminReturnReviewService} for every
+	 * warehouse-review lifecycle mutation (start/release/take-over/close/
+	 * cancel) — serializes concurrent lifecycle attempts on the <em>same</em>
+	 * return (mutations to different returns never block each other) so, for
+	 * example, two concurrent Start Review calls can never both observe
+	 * {@code AWAITING_WAREHOUSE} and both "win." No driver scoping: unlike
+	 * the DRIVER-owned variant above, ADMIN operations are tenant-scoped
+	 * only.
+	 */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select r from ReturnRecord r where r.id = :id and r.tenant.id = :tenantId")
+	Optional<ReturnRecord> findByIdAndTenantIdForUpdate(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
 }

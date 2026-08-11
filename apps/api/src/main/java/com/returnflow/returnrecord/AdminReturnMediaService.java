@@ -9,14 +9,15 @@ import com.returnflow.storage.ReturnMediaStorage;
 import com.returnflow.tenant.TenantContext;
 
 /**
- * ADMIN-only authenticated media content access (Phase 6A) — the existing
- * content endpoints under {@code /api/v1/driver/**} require DRIVER role and
- * ownership, so an ADMIN cannot use them. This reuses the exact same
- * tenant-scoped repository lookups {@code ReturnPhotoService}/
- * {@code ReturnSignatureService} already use for the DRIVER endpoints —
- * neither of those lookups checks driver ownership, only tenant — so no
- * repository changes were needed. Read-only: no upload, replace, or delete
- * capability exists here, matching Phase 6A's read-only scope.
+ * ADMIN-only authenticated media content access — the existing content
+ * endpoints under {@code /api/v1/driver/**} require DRIVER role and
+ * ownership, so an ADMIN cannot use them. Photo/customer-signature lookups
+ * reuse the exact same tenant-scoped repository queries the DRIVER
+ * endpoints already use — neither checks driver ownership, only tenant.
+ * {@link #warehouseSignatureContent} (Phase 7A) is only ever reachable once
+ * {@code AdminReturnReviewService.close(...)} has written one. Read-only:
+ * no upload, replace, or delete capability exists here — the warehouse
+ * signature is written only by that Close transition.
  */
 @Service
 class AdminReturnMediaService {
@@ -48,7 +49,19 @@ class AdminReturnMediaService {
 	ReturnSignatureService.SignatureContent signatureContent(UUID returnId) {
 		UUID tenantId = TenantContext.get().getId();
 		ReturnRecord returnRecord = requireOwnedReturn(returnId, tenantId);
-		ReturnSignature signature = returnSignatureRepository.findByReturnRecordIdAndTenantId(returnRecord.getId(), tenantId)
+		ReturnSignature signature = returnSignatureRepository
+				.findByReturnRecordIdAndTenantIdAndSignatureType(returnRecord.getId(), tenantId, SignatureType.CUSTOMER)
+				.orElseThrow(ReturnSignatureNotFoundException::new);
+		byte[] bytes = returnMediaStorage.read(signature.getStorageKey());
+		return new ReturnSignatureService.SignatureContent(bytes, signature.getContentType());
+	}
+
+	@Transactional(readOnly = true)
+	ReturnSignatureService.SignatureContent warehouseSignatureContent(UUID returnId) {
+		UUID tenantId = TenantContext.get().getId();
+		ReturnRecord returnRecord = requireOwnedReturn(returnId, tenantId);
+		ReturnSignature signature = returnSignatureRepository
+				.findByReturnRecordIdAndTenantIdAndSignatureType(returnRecord.getId(), tenantId, SignatureType.WAREHOUSE)
 				.orElseThrow(ReturnSignatureNotFoundException::new);
 		byte[] bytes = returnMediaStorage.read(signature.getStorageKey());
 		return new ReturnSignatureService.SignatureContent(bytes, signature.getContentType());
