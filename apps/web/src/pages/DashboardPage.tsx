@@ -10,8 +10,6 @@ import { EMPTY_FILTERS, filtersToSearchParams } from '../returns/filters';
 import { useDashboardSummary, useLatestReturns } from '../returns/queries';
 import { todaySydneyDate } from '../returns/sydneyDate';
 
-const NOT_YET_OPERATIONAL_TEXT = 'Available with warehouse review';
-
 export function DashboardPage() {
   useEffect(() => {
     document.title = 'ReturnFlow — Dashboard';
@@ -23,6 +21,21 @@ export function DashboardPage() {
 
   const goToWaitingWarehouse = () => {
     const params = filtersToSearchParams({ ...EMPTY_FILTERS, status: 'AWAITING_WAREHOUSE' });
+    navigate(`/returns?${params.toString()}`);
+  };
+
+  const goToInReview = () => {
+    const params = filtersToSearchParams({ ...EMPTY_FILTERS, status: 'IN_REVIEW' });
+    navigate(`/returns?${params.toString()}`);
+  };
+
+  const goToClosedToday = () => {
+    // Filters on closedAt, not createdAt — the card's own count is computed
+    // from closedAt (AdminReturnService.summary), so the returns this link
+    // reaches must represent that exact same set (docs/WEB_UX.md §5), not a
+    // "created today" approximation.
+    const today = todaySydneyDate();
+    const params = filtersToSearchParams({ ...EMPTY_FILTERS, status: 'CLOSED', closedFrom: today, closedTo: today });
     navigate(`/returns?${params.toString()}`);
   };
 
@@ -51,20 +64,8 @@ export function DashboardPage() {
       ) : (
         <div className="summary-cards">
           <SummaryCard label="Waiting Warehouse" value={summary.data?.waitingWarehouse} loading={summary.isPending} onClick={goToWaitingWarehouse} />
-          <SummaryCard
-            label="In Review"
-            value={summary.data?.inReview}
-            loading={summary.isPending}
-            disabled
-            secondaryText={NOT_YET_OPERATIONAL_TEXT}
-          />
-          <SummaryCard
-            label="Closed Today"
-            value={summary.data?.closedToday}
-            loading={summary.isPending}
-            disabled
-            secondaryText={NOT_YET_OPERATIONAL_TEXT}
-          />
+          <SummaryCard label="In Review" value={summary.data?.inReview} loading={summary.isPending} onClick={goToInReview} />
+          <SummaryCard label="Closed Today" value={summary.data?.closedToday} loading={summary.isPending} onClick={goToClosedToday} />
           <SummaryCard label="Returns Today" value={summary.data?.returnsToday} loading={summary.isPending} onClick={goToReturnsToday} />
         </div>
       )}

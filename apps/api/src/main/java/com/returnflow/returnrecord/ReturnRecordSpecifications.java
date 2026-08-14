@@ -54,6 +54,25 @@ final class ReturnRecordSpecifications {
 		return (root, query, cb) -> cb.lessThan(root.get("createdAt"), to);
 	}
 
+	/**
+	 * {@code from} inclusive, {@code to} exclusive — same shape as {@link #createdBetween},
+	 * but against {@code closed_at} (Phase 7B). A row with a {@code null closedAt}
+	 * (not yet closed) never matches either bound, so this is safe to combine
+	 * with any status filter without an explicit {@code IS NOT NULL} check.
+	 */
+	static Specification<ReturnRecord> closedBetween(Instant from, Instant to) {
+		if (from == null && to == null) {
+			return null;
+		}
+		if (from != null && to != null) {
+			return (root, query, cb) -> cb.and(cb.greaterThanOrEqualTo(root.get("closedAt"), from), cb.lessThan(root.get("closedAt"), to));
+		}
+		if (from != null) {
+			return (root, query, cb) -> cb.greaterThanOrEqualTo(root.get("closedAt"), from);
+		}
+		return (root, query, cb) -> cb.lessThan(root.get("closedAt"), to);
+	}
+
 	static Specification<ReturnRecord> hasDriver(UUID driverId) {
 		if (driverId == null) {
 			return null;

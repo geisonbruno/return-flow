@@ -1,5 +1,5 @@
-/** Mirrors the backend's `returnrecord.ReturnStatus` — only `AWAITING_WAREHOUSE` exists until Phase 7A. */
-export type ReturnStatus = 'AWAITING_WAREHOUSE';
+/** Mirrors the backend's `returnrecord.ReturnStatus` (Phase 7A): the complete four-value lifecycle. */
+export type ReturnStatus = 'AWAITING_WAREHOUSE' | 'IN_REVIEW' | 'CLOSED' | 'CANCELLED';
 
 /** Mirrors the backend's `returnrecord.ReturnReason` (root CLAUDE.md §10), exactly. */
 export type ReturnReason =
@@ -32,6 +32,20 @@ export interface RouteSummary {
   active: boolean;
 }
 
+/** Matches the backend's `returnrecord.dto.AdminSummaryResponse` — the small nested ADMIN representation embedded as reviewer, closer, or canceller. */
+export interface AdminSummary {
+  id: string;
+  fullName: string;
+}
+
+/** One point of a normalized (0..1) signature stroke — mirrors the backend's `SignaturePointRequest`. */
+export interface SignaturePoint {
+  x: number;
+  y: number;
+}
+
+export type SignatureStroke = SignaturePoint[];
+
 /** Matches the backend's `returnrecord.dto.AdminReturnSummaryResponse` (GET /admin/dashboard/summary). */
 export interface AdminDashboardSummary {
   waitingWarehouse: number;
@@ -40,7 +54,12 @@ export interface AdminDashboardSummary {
   returnsToday: number;
 }
 
-/** Matches the backend's `returnrecord.dto.AdminReturnListItemResponse` (one row of GET /admin/returns). */
+/**
+ * Matches the backend's `returnrecord.dto.AdminReturnListItemResponse` (one
+ * row of GET /admin/returns). `reviewer` is `null` until a review has
+ * started and remains set after `CLOSED` — a return cancelled before any
+ * review starts keeps it `null` (root CLAUDE.md §17.2).
+ */
 export interface AdminReturnListItem {
   id: string;
   returnNumber: string;
@@ -52,6 +71,7 @@ export interface AdminReturnListItem {
   status: ReturnStatus;
   driver: DriverSummary;
   route: RouteSummary;
+  reviewer: AdminSummary | null;
   createdAt: string;
   photoCount: number;
   hasSignature: boolean;
@@ -102,7 +122,16 @@ export interface ReturnSignature {
   signedAt: string;
 }
 
-/** Matches the backend's `returnrecord.dto.AdminReturnDetailResponse` (GET /admin/returns/{returnId}). No reviewer/warehouse/cancellation fields — none exist until Phase 7A. */
+/**
+ * Matches the backend's `returnrecord.dto.AdminReturnDetailResponse` (GET
+ * /admin/returns/{returnId}, and every Phase 7A lifecycle action response).
+ * Everything from `reviewer` onward is `null` until the corresponding
+ * transition happens: `reviewer`/`reviewStartedAt` only while/after a review
+ * has started; the warehouse decision fields only once `CLOSED`;
+ * `cancelledBy`/`cancelledAt`/`cancellationReason` only once `CANCELLED`.
+ * `warehouseRepresentativeName` is derived from `warehouseSignature.signerName`
+ * on the backend — the same pattern the customer side already uses.
+ */
 export interface AdminReturnDetail {
   id: string;
   returnNumber: string;
@@ -118,6 +147,31 @@ export interface AdminReturnDetail {
   route: RouteSummary;
   photos: ReturnPhoto[];
   signature: ReturnSignature | null;
+  reviewer: AdminSummary | null;
+  reviewStartedAt: string | null;
+  sellable: boolean | null;
+  creditCustomer: boolean | null;
+  chargeCustomer: boolean | null;
+  chargeDriver: boolean | null;
+  warehouseObservation: string | null;
+  warehouseRepresentativeName: string | null;
+  warehouseSignature: ReturnSignature | null;
+  closedBy: AdminSummary | null;
+  closedAt: string | null;
+  cancelledBy: AdminSummary | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Request payload for `POST /admin/returns/{id}/close` — matches the backend's `CloseReturnRequest` exactly. */
+export interface CloseReturnPayload {
+  sellable: boolean;
+  creditCustomer: boolean;
+  chargeCustomer: boolean;
+  chargeDriver: boolean;
+  warehouseObservation?: string;
+  warehouseRepresentativeName: string;
+  warehouseSignatureStrokes: SignatureStroke[];
 }

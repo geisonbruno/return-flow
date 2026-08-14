@@ -26,6 +26,8 @@ describe('parseReturnsFilters', () => {
       reason: 'DAMAGED',
       createdFrom: '2026-01-01',
       createdTo: '2026-01-31',
+      closedFrom: '2026-02-01',
+      closedTo: '2026-02-28',
       driverId: '11111111-1111-1111-1111-111111111111',
       routeId: '22222222-2222-2222-2222-222222222222',
     });
@@ -37,13 +39,15 @@ describe('parseReturnsFilters', () => {
       reason: 'DAMAGED',
       createdFrom: '2026-01-01',
       createdTo: '2026-01-31',
+      closedFrom: '2026-02-01',
+      closedTo: '2026-02-28',
       driverId: '11111111-1111-1111-1111-111111111111',
       routeId: '22222222-2222-2222-2222-222222222222',
     });
   });
 
   it('falls back to defaults for an unknown/invalid status instead of passing it through', () => {
-    const params = new URLSearchParams({ status: 'IN_REVIEW' });
+    const params = new URLSearchParams({ status: 'NOT_A_REAL_STATUS' });
     expect(parseReturnsFilters(params).status).toBe('');
   });
 
@@ -55,6 +59,13 @@ describe('parseReturnsFilters', () => {
   it('rejects a malformed date instead of forwarding it to the API', () => {
     const params = new URLSearchParams({ createdFrom: 'not-a-date' });
     expect(parseReturnsFilters(params).createdFrom).toBe('');
+  });
+
+  it('rejects a malformed closed date the same way as a malformed created date', () => {
+    const params = new URLSearchParams({ closedFrom: 'not-a-date', closedTo: '31/12/2026' });
+    const result = parseReturnsFilters(params);
+    expect(result.closedFrom).toBe('');
+    expect(result.closedTo).toBe('');
   });
 
   it('rejects a malformed UUID for driverId/routeId', () => {
@@ -90,6 +101,8 @@ describe('filtersToSearchParams', () => {
       reason: 'DAMAGED',
       createdFrom: '2026-01-01',
       createdTo: '2026-01-31',
+      closedFrom: '2026-02-01',
+      closedTo: '2026-02-28',
       driverId: '11111111-1111-1111-1111-111111111111',
       routeId: '22222222-2222-2222-2222-222222222222',
     };
@@ -111,6 +124,7 @@ describe('hasActiveFilters', () => {
     expect(hasActiveFilters({ ...EMPTY_FILTERS, search: 'acme' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, status: 'AWAITING_WAREHOUSE' })).toBe(true);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, driverId: '11111111-1111-1111-1111-111111111111' })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, closedFrom: '2026-01-01' })).toBe(true);
   });
 
   it('is unaffected by page alone', () => {

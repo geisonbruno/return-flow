@@ -1,6 +1,14 @@
 import { authorizedRequestBlob, authorizedRequestJson } from '../api/apiClient';
 import { toApiRelativePath } from '../config/environment';
-import type { AdminDashboardSummary, AdminReturnDetail, AdminReturnListItem, AdminRouteSummary, AdminUserSummary, PageResponse } from './types';
+import type {
+  AdminDashboardSummary,
+  AdminReturnDetail,
+  AdminReturnListItem,
+  AdminRouteSummary,
+  AdminUserSummary,
+  CloseReturnPayload,
+  PageResponse,
+} from './types';
 
 export function fetchDashboardSummary(): Promise<AdminDashboardSummary> {
   return authorizedRequestJson<AdminDashboardSummary>('/admin/dashboard/summary');
@@ -15,6 +23,9 @@ export interface ReturnListParams {
   reason?: string;
   createdFrom?: string;
   createdTo?: string;
+  /** Filters on `closedAt` (Phase 7B) — see `returns/filters.ts`'s `ReturnsFilters.closedFrom`/`closedTo`. */
+  closedFrom?: string;
+  closedTo?: string;
   driverId?: string;
   routeId?: string;
 }
@@ -28,6 +39,8 @@ function buildReturnListQuery(params: ReturnListParams): string {
   if (params.reason) query.set('reason', params.reason);
   if (params.createdFrom) query.set('createdFrom', params.createdFrom);
   if (params.createdTo) query.set('createdTo', params.createdTo);
+  if (params.closedFrom) query.set('closedFrom', params.closedFrom);
+  if (params.closedTo) query.set('closedTo', params.closedTo);
   if (params.driverId) query.set('driverId', params.driverId);
   if (params.routeId) query.set('routeId', params.routeId);
   return query.toString();
@@ -54,4 +67,36 @@ export function fetchReturnDetail(returnId: string): Promise<AdminReturnDetail> 
 /** `contentPath` is a backend-provided `ReturnPhotoResponse`/`ReturnSignatureResponse` value — resolved before the request so it is never combined with the API base twice. */
 export function fetchMediaBlob(contentPath: string): Promise<Blob> {
   return authorizedRequestBlob(toApiRelativePath(contentPath));
+}
+
+/**
+ * The Phase 7A warehouse-review lifecycle actions. Every one of these posts
+ * no body except where the backend's own request DTO requires one, and every
+ * one returns the same `AdminReturnDetailResponse` shape `fetchReturnDetail`
+ * does, reflecting the return's new authoritative state after the
+ * transition (`AdminReturnReviewController`).
+ */
+export function startReview(returnId: string): Promise<AdminReturnDetail> {
+  return authorizedRequestJson<AdminReturnDetail>(`/admin/returns/${returnId}/start-review`, { method: 'POST' });
+}
+
+export function releaseReview(returnId: string): Promise<AdminReturnDetail> {
+  return authorizedRequestJson<AdminReturnDetail>(`/admin/returns/${returnId}/release-review`, { method: 'POST' });
+}
+
+/** `expectedCurrentReviewerId` must be the reviewer ID currently shown by the authoritative detail response — never a stale cached value. */
+export function takeOverReview(returnId: string, expectedCurrentReviewerId: string): Promise<AdminReturnDetail> {
+  return authorizedRequestJson<AdminReturnDetail>(`/admin/returns/${returnId}/take-over-review`, {
+    method: 'POST',
+    body: { expectedCurrentReviewerId },
+  });
+}
+
+/** The single atomic Close request — every required warehouse field and the normalized signature strokes together, per root CLAUDE.md §12 / `docs/WEB_UX.md` §8. */
+export function closeReturn(returnId: string, payload: CloseReturnPayload): Promise<AdminReturnDetail> {
+  return authorizedRequestJson<AdminReturnDetail>(`/admin/returns/${returnId}/close`, { method: 'POST', body: payload });
+}
+
+export function cancelReturn(returnId: string, reason: string): Promise<AdminReturnDetail> {
+  return authorizedRequestJson<AdminReturnDetail>(`/admin/returns/${returnId}/cancel`, { method: 'POST', body: { reason } });
 }

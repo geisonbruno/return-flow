@@ -30,7 +30,7 @@ function renderDashboard() {
   );
 }
 
-const SUMMARY = { waitingWarehouse: 4, inReview: 0, closedToday: 0, returnsToday: 7 };
+const SUMMARY = { waitingWarehouse: 4, inReview: 2, closedToday: 3, returnsToday: 7 };
 
 const LATEST_RETURNS_PAGE = {
   content: [
@@ -114,13 +114,44 @@ describe('DashboardPage', () => {
     expect(screen.getByText('7')).toBeInTheDocument();
   });
 
-  it('marks In Review and Closed Today as visibly not yet operational', async () => {
+  it('shows real In Review and Closed Today counts as clickable cards', async () => {
     stubFetch();
     renderDashboard();
 
-    await waitFor(() => expect(screen.getAllByText('Available with warehouse review')).toHaveLength(2));
-    expect(screen.queryByRole('button', { name: /In Review/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Closed Today/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('2')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /In Review/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Closed Today/ })).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('Available with warehouse review')).not.toBeInTheDocument();
+  });
+
+  it('navigates In Review to the correct Returns filter', async () => {
+    stubFetch();
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('2')).toBeInTheDocument());
+
+    await act(async () => {
+      screen.getByRole('button', { name: /In Review/ }).click();
+    });
+
+    await waitFor(() => expect(screen.getByTestId('returns-location')).toHaveTextContent('/returns?status=IN_REVIEW'));
+  });
+
+  it('navigates Closed Today to status=CLOSED using closedFrom/closedTo (not createdFrom/createdTo), with an explicit Australia/Sydney date', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    // 2026-01-01T23:30:00Z is already 2026-01-02 in Sydney (UTC+11 in January).
+    vi.setSystemTime(new Date('2026-01-01T23:30:00Z'));
+    stubFetch();
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument());
+
+    await act(async () => {
+      screen.getByRole('button', { name: /Closed Today/ }).click();
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('returns-location')).toHaveTextContent('/returns?status=CLOSED&closedFrom=2026-01-02&closedTo=2026-01-02'),
+    );
   });
 
   it('navigates Waiting Warehouse to the correct Returns filter', async () => {

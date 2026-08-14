@@ -35,6 +35,7 @@ export function ReturnTable({ returns, compact = false, backTo }: ReturnTablePro
             <th>Driver</th>
             <th>Route</th>
             <th>Status</th>
+            <th>Reviewer</th>
           </tr>
         </thead>
         <tbody>
@@ -55,6 +56,7 @@ export function ReturnTable({ returns, compact = false, backTo }: ReturnTablePro
               <td>
                 <StatusBadge label={STATUS_LABELS[item.status]} />
               </td>
+              <td>{item.reviewer?.fullName ?? '—'}</td>
             </tr>
           ))}
         </tbody>

@@ -14,7 +14,7 @@ const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please sign in again.
 /** Thrown by {@link AuthContextValue.login} when the authenticated account is not an ADMIN — distinct from `ApiError` so the Login page can show a different message. */
 export class UnauthorizedRoleError extends Error {}
 
-interface AuthContextValue {
+export interface AuthContextValue {
   status: AuthStatus;
   user: AuthenticatedUser | null;
   /** Set when the previous session ended for a reason the ADMIN should see on the Login page (expiry, wrong role). */
@@ -23,7 +23,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+/** Exported only so tests can supply a fixed `AuthContextValue` directly (see `pages/ReturnDetailsPage.test.tsx`) without re-running the full session-restoration network flow `AuthProvider` performs on mount. */
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('restoring');
