@@ -5,13 +5,16 @@
 
         .\dev.ps1
 
-    Starts PostgreSQL + MinIO (Docker), the Spring Boot API (apps/api, local
-    profile, via the Maven Wrapper), and the Vite dev server (apps/web) —
-    each backend/frontend process in its own visible PowerShell window so
-    logs stay readable. Safe to re-run: an already-running ReturnFlow
-    backend/frontend is detected and reused, never duplicated, and a
-    required port occupied by something else stops the script instead of
-    killing that process or picking another port.
+    Starts PostgreSQL + MinIO (Docker) and the Spring Boot API (apps/api,
+    local profile, via the Maven Wrapper) in its own visible PowerShell
+    window so backend logs stay separate and readable, then starts the Vite
+    dev server (apps/web) attached directly to THIS console — its logs
+    print right here, and it keeps running here after the script finishes
+    and hands control back to you (Ctrl+C in this console stops Vite only;
+    it has no effect on the separately-windowed backend). Safe to re-run:
+    an already-running ReturnFlow backend/frontend is detected and reused,
+    never duplicated, and a required port occupied by something else stops
+    the script instead of killing that process or picking another port.
 
     Optional: copy dev.local.ps1.example to dev.local.ps1 (repository root,
     ignored by Git) to set BOOTSTRAP_ADMIN_EMAIL/PASSWORD/NAME for the
@@ -39,11 +42,59 @@ $script:Summary = [ordered]@{
     Web        = 'not started'
 }
 $script:ShellHost = $null
+$script:NpmCmd = $null
+$script:NodeExe = $null
+$script:NodeDir = $null
 
 function Write-Section {
     param([string]$Title)
     Write-Host ''
     Write-Host "== $Title ==" -ForegroundColor Cyan
+}
+
+function Resolve-NpmCommand {
+    # A Windows Node.js install places both an extensionless POSIX shell
+    # script named "npm" and a real "npm.cmd" batch launcher in the same
+    # directory (`where.exe npm` lists both). Windows has no execution
+    # handler for the extensionless file at all — depending on the spawning
+    # shell/version and its PATHEXT-driven command-resolution order, a bare
+    # `npm` can resolve to that unusable file instead of npm.cmd, which is
+    # exactly what produced "npm is not recognized" in the spawned
+    # -NoProfile frontend window even though `npm -v` works fine in a normal
+    # terminal. Resolving npm.cmd's absolute path once here, in the parent
+    # process, and invoking that explicit path in the child (the same
+    # pattern already used for $MvnwCmd below) sidesteps the ambiguity
+    # entirely instead of depending on the child's own resolution order.
+    $cmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    # Fallback for an unusual install that doesn't expose a plain "npm.cmd"
+    # name on PATH: take the first "npm" match that is an actual executable
+    # Windows can run directly, skipping any extensionless script match.
+    $candidates = Get-Command npm -All -ErrorAction SilentlyContinue
+    $executable = $candidates | Where-Object { $_.Source -match '\.(cmd|exe)$' } | Select-Object -First 1
+    if ($executable) { return $executable.Source }
+
+    return $null
+}
+
+function Resolve-NodeExecutable {
+    # npm.cmd itself internally invokes the bare `node` command. Resolving
+    # npm.cmd's own path (Resolve-NpmCommand, above) is not enough on its
+    # own: a spawned -NoProfile child does not reliably inherit the Node.js
+    # install directory on PATH, so npm.cmd starts correctly but then fails
+    # with "node is not recognized" the moment it tries to run node. Node's
+    # own executable has no extensionless-script ambiguity like npm does —
+    # a plain node.exe resolution is enough, with the same "-All, first
+    # real executable" fallback as Resolve-NpmCommand purely for symmetry.
+    $cmd = Get-Command node.exe -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+
+    $candidates = Get-Command node -All -ErrorAction SilentlyContinue
+    $executable = $candidates | Where-Object { $_.Source -match '\.exe$' } | Select-Object -First 1
+    if ($executable) { return $executable.Source }
+
+    return $null
 }
 
 function Assert-RequiredTools {
@@ -54,22 +105,30 @@ function Assert-RequiredTools {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         $missing += 'docker (Docker Desktop CLI)'
     }
-    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    $script:NodeExe = Resolve-NodeExecutable
+    if (-not $script:NodeExe) {
+        $missing += 'node (Node.js)'
+    } else {
+        $script:NodeDir = Split-Path -Parent $script:NodeExe
+    }
+    $script:NpmCmd = Resolve-NpmCommand
+    if (-not $script:NpmCmd) {
         $missing += 'npm (Node.js)'
     }
     if (-not (Test-Path $MvnwCmd)) {
         $missing += "Maven Wrapper at $MvnwCmd"
     }
 
-    # Backend/frontend each run in their own spawned window; pwsh (PowerShell
-    # 7) is preferred if present, Windows PowerShell is an acceptable
-    # fallback — only having neither is fatal.
+    # The backend runs in its own spawned window; pwsh (PowerShell 7) is
+    # preferred if present, Windows PowerShell is an acceptable fallback —
+    # only having neither is fatal. The frontend no longer spawns a window
+    # of its own (see Start-Frontend), so it needs no shell-host choice.
     if (Get-Command pwsh -ErrorAction SilentlyContinue) {
         $script:ShellHost = 'pwsh'
     } elseif (Get-Command powershell -ErrorAction SilentlyContinue) {
         $script:ShellHost = 'powershell'
     } else {
-        $missing += 'pwsh or powershell (to open the backend/frontend windows)'
+        $missing += 'pwsh or powershell (to open the backend window)'
     }
 
     if ($missing.Count -gt 0) {
@@ -268,14 +327,33 @@ function Start-Frontend {
         return
     }
 
-    Write-Host 'Starting frontend in a new window...' -ForegroundColor Yellow
-    $command = "`$Host.UI.RawUI.WindowTitle = 'ReturnFlow Web (local)'; Set-Location '$WebRoot'; npm run dev"
-    Start-Process -FilePath $script:ShellHost -ArgumentList '-NoProfile', '-NoExit', '-Command', $command -WorkingDirectory $WebRoot | Out-Null
+    Write-Host 'Starting frontend, attached to this console...' -ForegroundColor Yellow
+    # npm.cmd (resolved above) internally invokes bare `node`; defensively
+    # ensure THIS process's own PATH already contains the resolved Node
+    # directory before launching it, since Start-Process below inherits
+    # this process's environment automatically (same defensive intent as
+    # Start-Backend's PATH preparation for mvnw.cmd's inner "powershell"
+    # call, applied here to npm.cmd's inner "node" call). This only ever
+    # changes this script's own process-scoped $env:PATH, never the
+    # persistent machine/user environment.
+    if (($env:PATH -split ';') -notcontains $script:NodeDir) {
+        $env:PATH = "$script:NodeDir;$env:PATH"
+    }
+
+    # -NoNewWindow keeps Vite's own stdout/stderr attached to the console
+    # that invoked .\dev.ps1 — no separate window/tab — while omitting
+    # -Wait lets this script continue immediately to the health check and
+    # final summary below instead of blocking here until Vite exits (which,
+    # for a dev server, is effectively never without Ctrl+C). The resolved
+    # npm.cmd absolute path is invoked directly via -FilePath, not a bare
+    # `npm` name, for the same reason as Resolve-NpmCommand's own comment.
+    Start-Process -FilePath $script:NpmCmd -ArgumentList 'run', 'dev' -NoNewWindow -WorkingDirectory $WebRoot | Out-Null
 
     if (Wait-HttpHealthy -Url "http://localhost:$FrontendPort/" -TimeoutSeconds 60) {
         $script:Summary['Web'] = "http://localhost:$FrontendPort"
+        Write-Host "Vite is now attached to this console — Ctrl+C here stops the frontend only; the backend keeps running in its own window." -ForegroundColor DarkGray
     } else {
-        $script:Summary['Web'] = "FAILED - not reachable within 60s, check the 'ReturnFlow Web (local)' window"
+        $script:Summary['Web'] = "FAILED - not reachable within 60s, check the console output above"
     }
 }
 
