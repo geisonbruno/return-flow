@@ -73,11 +73,25 @@ class AdminReturnService {
 		// real upper bound is the start of the *next* day.
 		Instant createdToExclusive = toDate == null ? null : operationalDayService.startOfDay(toDate.plusDays(1));
 
+		// closedFrom/closedTo (Phase 7B) follow the exact same inclusive-date/
+		// exclusive-instant convention as createdFrom/createdTo above, against
+		// closed_at instead — kept as an independent date range rather than
+		// reusing createdFrom/createdTo, since a return's creation and closing
+		// dates are frequently different days.
+		LocalDate closedFromDate = parseDate(query.closedFrom());
+		LocalDate closedToDate = parseDate(query.closedTo());
+		if (closedFromDate != null && closedToDate != null && closedFromDate.isAfter(closedToDate)) {
+			throw new InvalidReturnFilterException();
+		}
+		Instant closedFrom = closedFromDate == null ? null : operationalDayService.startOfDay(closedFromDate);
+		Instant closedToExclusive = closedToDate == null ? null : operationalDayService.startOfDay(closedToDate.plusDays(1));
+
 		Specification<ReturnRecord> spec = combine(
 				ReturnRecordSpecifications.forTenant(tenantId),
 				ReturnRecordSpecifications.hasStatus(status),
 				ReturnRecordSpecifications.hasReason(reason),
 				ReturnRecordSpecifications.createdBetween(createdFrom, createdToExclusive),
+				ReturnRecordSpecifications.closedBetween(closedFrom, closedToExclusive),
 				ReturnRecordSpecifications.hasDriver(query.driverId()),
 				ReturnRecordSpecifications.hasRoute(query.routeId()),
 				ReturnRecordSpecifications.matchesSearch(query.search()));

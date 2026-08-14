@@ -9,6 +9,16 @@ export interface ReturnsFilters {
   reason: ReturnReason | '';
   createdFrom: string;
   createdTo: string;
+  /**
+   * Filters on `closedAt`, independently of `createdFrom`/`createdTo` — used
+   * by the Dashboard's Closed Today shortcut so the returns it links to
+   * match the same `closedAt`-based set the card's own count represents
+   * (`docs/WEB_UX.md` §5). No dedicated filter-bar input exists for this
+   * dimension yet; it is reachable only via that shortcut's URL, the same
+   * way every other filter here is URL-addressable.
+   */
+  closedFrom: string;
+  closedTo: string;
   driverId: string;
   routeId: string;
 }
@@ -20,11 +30,13 @@ export const EMPTY_FILTERS: ReturnsFilters = {
   reason: '',
   createdFrom: '',
   createdTo: '',
+  closedFrom: '',
+  closedTo: '',
   driverId: '',
   routeId: '',
 };
 
-const VALID_STATUSES: readonly ReturnStatus[] = ['AWAITING_WAREHOUSE'];
+const VALID_STATUSES: readonly ReturnStatus[] = ['AWAITING_WAREHOUSE', 'IN_REVIEW', 'CLOSED', 'CANCELLED'];
 const VALID_REASONS: readonly ReturnReason[] = [
   'WRONG_ITEM_DELIVERED',
   'EXTRA_ITEM',
@@ -78,6 +90,8 @@ export function parseReturnsFilters(searchParams: URLSearchParams): ReturnsFilte
     reason: sanitizeEnum(searchParams.get('reason'), VALID_REASONS),
     createdFrom: sanitizeDate(searchParams.get('createdFrom')),
     createdTo: sanitizeDate(searchParams.get('createdTo')),
+    closedFrom: sanitizeDate(searchParams.get('closedFrom')),
+    closedTo: sanitizeDate(searchParams.get('closedTo')),
     driverId: sanitizeUuid(searchParams.get('driverId')),
     routeId: sanitizeUuid(searchParams.get('routeId')),
   };
@@ -92,6 +106,8 @@ export function filtersToSearchParams(filters: ReturnsFilters): URLSearchParams 
   if (filters.reason) params.set('reason', filters.reason);
   if (filters.createdFrom) params.set('createdFrom', filters.createdFrom);
   if (filters.createdTo) params.set('createdTo', filters.createdTo);
+  if (filters.closedFrom) params.set('closedFrom', filters.closedFrom);
+  if (filters.closedTo) params.set('closedTo', filters.closedTo);
   if (filters.driverId) params.set('driverId', filters.driverId);
   if (filters.routeId) params.set('routeId', filters.routeId);
   return params;
@@ -100,7 +116,15 @@ export function filtersToSearchParams(filters: ReturnsFilters): URLSearchParams 
 /** True when no search text and no filter is active — used to distinguish "empty tenant" from "no results match the filters." */
 export function hasActiveFilters(filters: ReturnsFilters): boolean {
   return Boolean(
-    filters.search || filters.status || filters.reason || filters.createdFrom || filters.createdTo || filters.driverId || filters.routeId,
+    filters.search ||
+      filters.status ||
+      filters.reason ||
+      filters.createdFrom ||
+      filters.createdTo ||
+      filters.closedFrom ||
+      filters.closedTo ||
+      filters.driverId ||
+      filters.routeId,
   );
 }
 

@@ -57,6 +57,8 @@ export function ReturnsListPage() {
     reason: filters.reason || undefined,
     createdFrom: filters.createdFrom || undefined,
     createdTo: filters.createdTo || undefined,
+    closedFrom: filters.closedFrom || undefined,
+    closedTo: filters.closedTo || undefined,
     driverId: filters.driverId || undefined,
     routeId: filters.routeId || undefined,
   });
@@ -83,6 +85,8 @@ export function ReturnsListPage() {
   };
 
   const filtersActive = hasActiveFilters(filters);
+  const closedDateFilterActive = Boolean(filters.closedFrom || filters.closedTo);
+  const handleClearClosedDateFilter = () => applyFilters({ closedFrom: '', closedTo: '' });
   const page = returnsQuery.data;
 
   return (
@@ -179,6 +183,15 @@ export function ReturnsListPage() {
           Clear filters
         </button>
       </form>
+
+      {closedDateFilterActive && (
+        <div className="active-filter-chip" role="status">
+          <span>Closed today</span>
+          <button type="button" onClick={handleClearClosedDateFilter} aria-label="Remove closed date filter">
+            ×
+          </button>
+        </div>
+      )}
 
       {draftDateRangeInvalid && <p className="error-message" role="alert">&quot;Created from&quot; must not be after &quot;Created to&quot;.</p>}
 

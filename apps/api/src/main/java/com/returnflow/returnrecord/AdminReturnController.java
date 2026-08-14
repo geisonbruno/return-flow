@@ -19,12 +19,16 @@ import com.returnflow.returnrecord.dto.AdminReturnListItemResponse;
  * PUT/PATCH/DELETE and no status-transition endpoint: review, close,
  * cancel, and every other mutation belong to Phase 7A.
  *
- * <p>{@code status}/{@code reason}/{@code createdFrom}/{@code createdTo}
- * are accepted as plain strings, not bound enum/{@code LocalDate}
- * parameters, so an invalid value reaches {@code AdminReturnService}'s own
- * validation and this module's {@code InvalidReturnFilterException} —
- * a safe {@code ProblemDetail} — rather than a generic Spring MVC
- * type-mismatch failure.
+ * <p>{@code status}/{@code reason}/{@code createdFrom}/{@code createdTo}/
+ * {@code closedFrom}/{@code closedTo} are accepted as plain strings, not
+ * bound enum/{@code LocalDate} parameters, so an invalid value reaches
+ * {@code AdminReturnService}'s own validation and this module's
+ * {@code InvalidReturnFilterException} — a safe {@code ProblemDetail} —
+ * rather than a generic Spring MVC type-mismatch failure. {@code closedFrom}/
+ * {@code closedTo} (Phase 7B) filter independently of {@code createdFrom}/
+ * {@code createdTo}, against {@code closed_at} — needed so the Dashboard's
+ * "Closed Today" card can link to a returns view matching its own
+ * {@code closedAt}-based count exactly, per {@code docs/WEB_UX.md} §5.
  */
 @RestController
 @RequestMapping("/api/v1/admin/returns")
@@ -45,9 +49,12 @@ class AdminReturnController {
 			@RequestParam(required = false) String reason,
 			@RequestParam(required = false) String createdFrom,
 			@RequestParam(required = false) String createdTo,
+			@RequestParam(required = false) String closedFrom,
+			@RequestParam(required = false) String closedTo,
 			@RequestParam(required = false) UUID driverId,
 			@RequestParam(required = false) UUID routeId) {
-		AdminReturnListQuery query = new AdminReturnListQuery(page, size, search, status, reason, createdFrom, createdTo, driverId, routeId);
+		AdminReturnListQuery query = new AdminReturnListQuery(page, size, search, status, reason, createdFrom, createdTo,
+				closedFrom, closedTo, driverId, routeId);
 		return ResponseEntity.ok(adminReturnService.list(query));
 	}
 

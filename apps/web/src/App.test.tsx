@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,6 +80,14 @@ const RETURN_DETAIL = {
   updatedAt: '2026-08-06T02:15:00Z',
 };
 
+/** In review, owned by the authenticated ADMIN — used by the nav-guard test below to exercise the real editable warehouse-review form. */
+const RETURN_DETAIL_IN_REVIEW = {
+  ...RETURN_DETAIL,
+  status: 'IN_REVIEW',
+  reviewer: { id: ADMIN_USER.userId, fullName: ADMIN_USER.fullName },
+  reviewStartedAt: '2026-08-06T04:00:00Z',
+};
+
 const RETURN_LIST_ITEM = {
   id: RETURN_DETAIL.id,
   returnNumber: RETURN_DETAIL.returnNumber,
@@ -97,7 +105,8 @@ const RETURN_LIST_ITEM = {
 };
 
 /** Like {@link stubAuthenticatedFetch}, extended with a real return detail and (optionally) that return appearing in the Returns list — for the navigation tests below. */
-function stubAuthenticatedFetchWithReturn(options: { inReturnsList?: boolean } = {}) {
+function stubAuthenticatedFetchWithReturn(options: { inReturnsList?: boolean; detail?: typeof RETURN_DETAIL } = {}) {
+  const detail = options.detail ?? RETURN_DETAIL;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL) => {
@@ -109,7 +118,7 @@ function stubAuthenticatedFetchWithReturn(options: { inReturnsList?: boolean } =
         return jsonResponse(200, ADMIN_USER);
       }
       if (url.includes(`/admin/returns/${RETURN_DETAIL.id}`)) {
-        return jsonResponse(200, RETURN_DETAIL);
+        return jsonResponse(200, detail);
       }
       if (url.includes('/admin/users') || url.includes('/admin/routes')) {
         return jsonResponse(200, []);
@@ -237,5 +246,48 @@ describe('App routing', () => {
 
     await waitFor(() => expect(window.location.pathname).toBe('/returns'));
     expect(window.location.search).toBe('?status=AWAITING_WAREHOUSE');
+  });
+
+  it('AppShell nav links ask for confirmation when the warehouse review form has unsaved values, and only navigate once confirmed', async () => {
+    saveRefreshToken('stored-refresh-token');
+    window.history.pushState({}, '', `/returns/${RETURN_DETAIL.id}`);
+    stubAuthenticatedFetchWithReturn({ detail: RETURN_DETAIL_IN_REVIEW });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText('Warehouse representative name')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Warehouse representative name'), { target: { value: 'Wes Warehouse' } });
+
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    await act(async () => {
+      within(nav).getByRole('link', { name: 'Returns' }).click();
+    });
+
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    expect(screen.getByText('Unsaved review information will be discarded.')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(`/returns/${RETURN_DETAIL.id}`);
+
+    await act(async () => {
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Leave' }).click();
+    });
+
+    await waitFor(() => expect(window.location.pathname).toBe('/returns'));
+  });
+
+  it('a nav-link navigation with no unsaved review values proceeds immediately, without a confirmation dialog', async () => {
+    saveRefreshToken('stored-refresh-token');
+    window.history.pushState({}, '', `/returns/${RETURN_DETAIL.id}`);
+    stubAuthenticatedFetchWithReturn({ detail: RETURN_DETAIL_IN_REVIEW });
+
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText('Warehouse representative name')).toBeInTheDocument());
+
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    await act(async () => {
+      within(nav).getByRole('link', { name: 'Dashboard' }).click();
+    });
+
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

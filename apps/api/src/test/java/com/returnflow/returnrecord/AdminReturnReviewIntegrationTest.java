@@ -588,7 +588,54 @@ class AdminReturnReviewIntegrationTest {
 				.andExpect(jsonPath("$.closedToday").value(1));
 	}
 
+	// --- List: closedFrom/closedTo filter (Phase 7B) ---
+
+	@Test
+	void closedDateRangeFilterMatchesTheSameSemanticSetAsTheClosedTodayCount() throws Exception {
+		// The exact case the Closed Today card's click-through must get right:
+		// created on an earlier day, but closed today — included by
+		// closedFrom/closedTo, not by any createdAt-based filter.
+		String returnId = createReturn(driverToken, "Customer Old Create New Close", "Product A");
+		backdateCreatedAt(returnId, Instant.now().minus(5, ChronoUnit.DAYS));
+		startReview(adminToken, returnId).andExpect(status().isOk());
+		closeReturn(adminToken, returnId, Map.of()).andExpect(status().isOk());
+
+		String returnIdClosedYesterday = createReturn(driverToken, "Customer Closed Yesterday", "Product B");
+		startReview(adminToken, returnIdClosedYesterday).andExpect(status().isOk());
+		closeReturn(adminToken, returnIdClosedYesterday, Map.of()).andExpect(status().isOk());
+		backdateClosedAt(returnIdClosedYesterday, Instant.now().minus(2, ChronoUnit.DAYS));
+
+		String today = java.time.LocalDate.now(java.time.ZoneId.of("Australia/Sydney")).toString();
+		mockMvc.perform(get("/api/v1/admin/returns").header(HttpHeaders.AUTHORIZATION, adminToken)
+						.param("status", "CLOSED").param("closedFrom", today).param("closedTo", today))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(1))
+				.andExpect(jsonPath("$.content[0].id").value(returnId));
+	}
+
+	@Test
+	void closedDateRangeFilterExcludesAReturnNeverClosed() throws Exception {
+		createReturn(driverToken, "Customer Never Closed", "Product A");
+
+		String today = java.time.LocalDate.now(java.time.ZoneId.of("Australia/Sydney")).toString();
+		mockMvc.perform(get("/api/v1/admin/returns").header(HttpHeaders.AUTHORIZATION, adminToken)
+						.param("closedFrom", today).param("closedTo", today))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(0));
+	}
+
+	@Test
+	void closedFromAfterClosedToIsRejected() throws Exception {
+		mockMvc.perform(get("/api/v1/admin/returns").header(HttpHeaders.AUTHORIZATION, adminToken)
+						.param("closedFrom", "2026-08-10").param("closedTo", "2026-08-01"))
+				.andExpect(status().isBadRequest());
+	}
+
 	// --- helpers ---
+
+	private void backdateCreatedAt(String returnId, Instant instant) {
+		jdbcTemplate.update("UPDATE return_record SET created_at = ? WHERE id = ?", java.sql.Timestamp.from(instant), UUID.fromString(returnId));
+	}
 
 	private org.springframework.test.web.servlet.ResultActions startReview(String token, String returnId) throws Exception {
 		return mockMvc.perform(post("/api/v1/admin/returns/" + returnId + "/start-review").header(HttpHeaders.AUTHORIZATION, token));

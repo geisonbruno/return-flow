@@ -6,6 +6,8 @@ export interface ProblemDetail {
   detail?: string;
   instance?: string;
   errors?: string[];
+  /** Present only on a review-ownership/stale-takeover 409 (`AdminReturnExceptionHandler`) — the return's actual current reviewer at the time of the conflict. */
+  currentReviewerName?: string;
 }
 
 async function parseProblemDetail(response: Response): Promise<ProblemDetail | null> {
@@ -76,4 +78,19 @@ export function toSafeErrorMessage(error: unknown, fallback: string): string {
     return fallback;
   }
   return fallback;
+}
+
+/**
+ * The same safe message as {@link toSafeErrorMessage}, with the current
+ * reviewer's name appended when the backend supplied one (a review-ownership
+ * or stale-takeover 409 — see `AdminReturnExceptionHandler`) — used by the
+ * warehouse-review conflict states so the ADMIN sees who currently owns the
+ * review, never a silent overwrite.
+ */
+export function toReviewConflictMessage(error: unknown, fallback: string): string {
+  const base = toSafeErrorMessage(error, fallback);
+  if (error instanceof ApiError && error.problem?.currentReviewerName) {
+    return `${base} Current reviewer: ${error.problem.currentReviewerName}.`;
+  }
+  return base;
 }

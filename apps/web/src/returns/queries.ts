@@ -1,6 +1,20 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQueryClient, type QueryClient, useQuery } from '@tanstack/react-query';
 
-import { fetchDashboardSummary, fetchMediaBlob, fetchReturnDetail, fetchReturns, fetchRoutes, fetchUsers, type ReturnListParams } from './api';
+import {
+  cancelReturn,
+  closeReturn,
+  fetchDashboardSummary,
+  fetchMediaBlob,
+  fetchReturnDetail,
+  fetchReturns,
+  fetchRoutes,
+  fetchUsers,
+  releaseReview,
+  startReview,
+  takeOverReview,
+  type ReturnListParams,
+} from './api';
+import type { AdminReturnDetail, CloseReturnPayload } from './types';
 
 /** Modest, per `apps/web/CLAUDE.md` ("simple polling is acceptable; WebSockets and browser push are not") — not real-time. */
 const DASHBOARD_REFETCH_INTERVAL_MS = 30_000;
@@ -110,5 +124,60 @@ export function useMediaBlob(contentPath: string | null | undefined) {
     enabled: Boolean(contentPath),
     gcTime: 0,
     staleTime: 0,
+  });
+}
+
+/**
+ * Every Phase 7A lifecycle mutation returns the return's new authoritative
+ * `AdminReturnDetailResponse`, so the detail cache is written directly from
+ * that response rather than waiting on a refetch. The returns list, Latest
+ * Returns, and dashboard summary are invalidated too — a status/reviewer
+ * change on one return can change counts and rows shown elsewhere, and none
+ * of those queries carry enough context to be patched in place safely.
+ */
+function afterLifecycleChange(queryClient: QueryClient, returnId: string, detail: AdminReturnDetail) {
+  queryClient.setQueryData(returnDetailQueryKey(returnId), detail);
+  void queryClient.invalidateQueries({ queryKey: ['admin', 'returns', 'list'] });
+  void queryClient.invalidateQueries({ queryKey: ['admin', 'returns', 'latest'] });
+  void queryClient.invalidateQueries({ queryKey: dashboardSummaryQueryKey });
+}
+
+export function useStartReview(returnId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => startReview(returnId),
+    onSuccess: (detail) => afterLifecycleChange(queryClient, returnId, detail),
+  });
+}
+
+export function useReleaseReview(returnId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => releaseReview(returnId),
+    onSuccess: (detail) => afterLifecycleChange(queryClient, returnId, detail),
+  });
+}
+
+export function useTakeOverReview(returnId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (expectedCurrentReviewerId: string) => takeOverReview(returnId, expectedCurrentReviewerId),
+    onSuccess: (detail) => afterLifecycleChange(queryClient, returnId, detail),
+  });
+}
+
+export function useCloseReturn(returnId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CloseReturnPayload) => closeReturn(returnId, payload),
+    onSuccess: (detail) => afterLifecycleChange(queryClient, returnId, detail),
+  });
+}
+
+export function useCancelReturn(returnId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) => cancelReturn(returnId, reason),
+    onSuccess: (detail) => afterLifecycleChange(queryClient, returnId, detail),
   });
 }

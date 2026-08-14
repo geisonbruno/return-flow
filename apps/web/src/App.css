@@ -310,6 +310,28 @@ button.summary-card--clickable:hover {
   border-radius: 4px;
 }
 
+.active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid #1f5f4a;
+  border-radius: 999px;
+  color: #1f5f4a;
+  font-size: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.active-filter-chip button {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* ---------- Empty / error / loading states ---------- */
 
 .empty-state,
@@ -477,4 +499,147 @@ button.summary-card--clickable:hover {
     grid-template-columns: 1fr;
     gap: 0.15rem;
   }
+}
+
+/* ---------- Warehouse review ---------- */
+
+.return-details-section--review {
+  grid-column: 1 / -1;
+}
+
+.review-banner {
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.review-actions__buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.secondary-button {
+  background: none;
+  color: #1f5f4a;
+}
+
+.secondary-button:hover {
+  background: #f2f8f6;
+}
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 32rem;
+}
+
+.review-form textarea,
+.review-form input[type='text'] {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+}
+
+.review-form__signature-label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.review-form__pad-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.field-error {
+  color: #7a1f1f;
+  font-size: 0.85rem;
+  margin: 0.15rem 0 0;
+}
+
+.yes-no-field {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.yes-no-field legend {
+  font-weight: 600;
+  padding: 0;
+  width: 100%;
+  margin-bottom: 0.35rem;
+}
+
+.yes-no-field__option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 400;
+}
+
+.warehouse-signature-pad {
+  width: 100%;
+  max-width: 26rem;
+  height: 180px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  touch-action: none;
+  display: block;
+}
+
+.warehouse-signature-pad--disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ---------- Confirm dialog ---------- */
+
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.confirm-dialog {
+  /* `Canvas`/`CanvasText` are CSS system colors that resolve against the
+     page's declared `color-scheme: light dark` (see index.css) — a light
+     surface in light mode, a dark surface in dark mode, matching every
+     other page in this app rather than a hardcoded white box. */
+  background: Canvas;
+  color: CanvasText;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  max-width: 28rem;
+  width: 100%;
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.confirm-dialog__summary {
+  margin: 0.5rem 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
 }

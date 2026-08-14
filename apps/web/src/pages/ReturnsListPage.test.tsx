@@ -35,6 +35,7 @@ function makeReturn(overrides: Record<string, unknown> = {}) {
     status: 'AWAITING_WAREHOUSE',
     driver: { id: DRIVER_ID, fullName: 'Dana Driver' },
     route: { id: ROUTE_ID, code: 'R1', name: 'North Loop', active: true },
+    reviewer: null,
     createdAt: '2026-08-06T02:15:00Z',
     photoCount: 0,
     hasSignature: false,
@@ -127,6 +128,34 @@ describe('ReturnsListPage', () => {
 
     await waitFor(() => expect(screen.getByText('RF-000042')).toBeInTheDocument());
     expect(screen.getByText('Acme Ltd')).toBeInTheDocument();
+  });
+
+  it('shows the reviewer name when a return is in review, and a neutral dash otherwise', async () => {
+    stubFetch(() =>
+      jsonResponse(
+        200,
+        makePage([
+          makeReturn({ id: 'r-reviewed', returnNumber: 'RF-000010', reviewer: { id: 'admin-1', fullName: 'Ada Admin' } }),
+          makeReturn({ id: 'r-unreviewed', returnNumber: 'RF-000011', reviewer: null }),
+        ]),
+      ),
+    );
+    renderReturnsPage();
+
+    await waitFor(() => expect(screen.getByText('Ada Admin')).toBeInTheDocument());
+    expect(screen.getByRole('columnheader', { name: 'Reviewer' })).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('status filter offers all four lifecycle statuses', async () => {
+    stubFetch();
+    renderReturnsPage();
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    expect(screen.getByRole('option', { name: 'Awaiting warehouse' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'In review' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Closed' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Cancelled' })).toBeInTheDocument();
   });
 
   it('links the Return # to /returns/{id}, preserving the current filtered view as the "back" destination', async () => {
@@ -224,6 +253,59 @@ describe('ReturnsListPage', () => {
       expect(url.searchParams.get('createdFrom')).toBe('2026-01-01');
       expect(url.searchParams.get('createdTo')).toBe('2026-01-31');
     });
+  });
+
+  it('a closedFrom/closedTo URL (as set by the Dashboard\'s Closed Today link) reaches the backend as closedFrom/closedTo, distinct from createdFrom/createdTo', async () => {
+    stubFetch();
+    renderReturnsPage('/returns?status=CLOSED&closedFrom=2026-01-02&closedTo=2026-01-02');
+
+    await waitFor(() => {
+      const url = lastReturnsRequestUrl();
+      expect(url.searchParams.get('status')).toBe('CLOSED');
+      expect(url.searchParams.get('closedFrom')).toBe('2026-01-02');
+      expect(url.searchParams.get('closedTo')).toBe('2026-01-02');
+      expect(url.searchParams.get('createdFrom')).toBeNull();
+      expect(url.searchParams.get('createdTo')).toBeNull();
+    });
+  });
+
+  it('shows a "Closed today" indicator when closedFrom/closedTo are active, and Clear filters removes it', async () => {
+    stubFetch();
+    renderReturnsPage('/returns?status=CLOSED&closedFrom=2026-01-02&closedTo=2026-01-02');
+
+    expect(await screen.findByText('Closed today')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    });
+
+    await waitFor(() => expect(screen.queryByText('Closed today')).not.toBeInTheDocument());
+  });
+
+  it('an individual remove on the "Closed today" indicator clears only closedFrom/closedTo, preserving other filters', async () => {
+    stubFetch();
+    renderReturnsPage('/returns?status=CLOSED&closedFrom=2026-01-02&closedTo=2026-01-02');
+    await screen.findByText('Closed today');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Remove closed date filter' }));
+    });
+
+    await waitFor(() => {
+      const url = lastReturnsRequestUrl();
+      expect(url.searchParams.get('closedFrom')).toBeNull();
+      expect(url.searchParams.get('closedTo')).toBeNull();
+      expect(url.searchParams.get('status')).toBe('CLOSED');
+    });
+    expect(screen.queryByText('Closed today')).not.toBeInTheDocument();
+  });
+
+  it('does not show the "Closed today" indicator when no closed-date filter is active', async () => {
+    stubFetch();
+    renderReturnsPage();
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+
+    expect(screen.queryByText('Closed today')).not.toBeInTheDocument();
   });
 
   it('driver filter reaches the backend as driverId', async () => {

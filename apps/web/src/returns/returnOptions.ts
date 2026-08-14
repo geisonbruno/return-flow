@@ -50,15 +50,18 @@ export function formatQuantityAndUnit(quantity: number, unit: ReturnUnit): strin
 }
 
 /**
- * Only `AWAITING_WAREHOUSE` exists until Phase 7A — this map is `Record<ReturnStatus, string>`
- * (not partial) for the same compile-time-safety reason as `REASON_LABELS`, and grows
- * automatically once the backend's `ReturnStatus` enum does.
+ * `Record<ReturnStatus, string>` (not partial) for the same compile-time-safety
+ * reason as `REASON_LABELS` — adding a new backend `ReturnStatus` value
+ * without updating this map is a compile error, not a silently-blank label.
  */
 export const STATUS_LABELS: Record<ReturnStatus, string> = {
   AWAITING_WAREHOUSE: 'Awaiting warehouse',
+  IN_REVIEW: 'In review',
+  CLOSED: 'Closed',
+  CANCELLED: 'Cancelled',
 };
 
-/** The only status a client can filter/navigate by until Phase 7A adds more. */
-export const STATUS_OPTIONS: readonly { value: ReturnStatus; label: string }[] = [
-  { value: 'AWAITING_WAREHOUSE', label: STATUS_LABELS.AWAITING_WAREHOUSE },
-];
+/** Selection order matching the lifecycle in root CLAUDE.md §9. */
+export const STATUS_OPTIONS: readonly { value: ReturnStatus; label: string }[] = (
+  ['AWAITING_WAREHOUSE', 'IN_REVIEW', 'CLOSED', 'CANCELLED'] as const
+).map((value) => ({ value, label: STATUS_LABELS[value] }));
