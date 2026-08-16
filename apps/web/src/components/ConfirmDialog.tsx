@@ -8,6 +8,13 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   confirmDisabled?: boolean;
+  /**
+   * Whether clicking the backdrop cancels. Defaults to `true` (the original
+   * behavior every confirmation uses). The Phase 8 administration forms pass
+   * `false`: those dialogs hold several typed fields, and losing them to a
+   * stray click outside would be a real data loss, not a harmless dismissal.
+   */
+  dismissOnBackdropClick?: boolean;
   /** Optional extra content between the message and the action buttons — a Close confirmation summary, a Cancel reason field, etc. */
   children?: ReactNode;
 }
@@ -18,9 +25,19 @@ interface ConfirmDialogProps {
  * Used for every warehouse-review action that needs one (Release, Takeover,
  * Close, Cancel) rather than one bespoke dialog per action.
  */
-export function ConfirmDialog({ title, message, confirmLabel, cancelLabel = 'Cancel', onConfirm, onCancel, confirmDisabled, children }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  cancelLabel = 'Cancel',
+  onConfirm,
+  onCancel,
+  confirmDisabled,
+  dismissOnBackdropClick = true,
+  children,
+}: ConfirmDialogProps) {
   return (
-    <div className="confirm-dialog-overlay" onClick={onCancel}>
+    <div className="confirm-dialog-overlay" onClick={dismissOnBackdropClick ? onCancel : undefined}>
       <div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" onClick={(event) => event.stopPropagation()}>
         <h2 id="confirm-dialog-title">{title}</h2>
         <p>{message}</p>
