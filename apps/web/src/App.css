@@ -600,6 +600,83 @@ button.summary-card--clickable:hover {
   pointer-events: none;
 }
 
+/* ---------- Administration (Users / Routes) ---------- */
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-toolbar .form-field {
+  margin-bottom: 0;
+  min-width: 16rem;
+}
+
+.admin-toolbar input {
+  font: inherit;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+}
+
+.admin-row-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-form select,
+.admin-form input[type='text'],
+.admin-form input[type='email'],
+.admin-form input[type='password'] {
+  font: inherit;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+}
+
+.admin-form__note {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+/* A text-styled action (show/hide password) that is genuinely a button, not a link. */
+.link-button {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #1f5f4a;
+  padding: 0.15rem 0;
+  text-decoration: underline;
+  font-size: 0.85rem;
+}
+
+.form-success {
+  background: #eaf6f0;
+  color: #1f5f4a;
+  border: 1px solid #a8d5c2;
+  border-radius: 4px;
+  padding: 0.6rem 0.9rem;
+  margin: 0 0 1rem;
+}
+
 /* ---------- Confirm dialog ---------- */
 
 .confirm-dialog-overlay {
