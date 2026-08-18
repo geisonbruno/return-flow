@@ -600,6 +600,20 @@ button.summary-card--clickable:hover {
   pointer-events: none;
 }
 
+/* ---------- Closed-return PDF action ---------- */
+
+.pdf-action {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+}
+
+.pdf-action__buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 /* ---------- Administration (Users / Routes) ---------- */
 
 .admin-toolbar {

@@ -122,6 +122,7 @@ interface LifecycleHandlers {
   takeOverReview?: () => Response | Promise<Response>;
   close?: () => Response | Promise<Response>;
   cancel?: () => Response | Promise<Response>;
+  pdf?: () => Response | Promise<Response>;
 }
 
 function stubLifecycleFetch(getDetail: () => unknown, handlers: LifecycleHandlers = {}) {
@@ -136,6 +137,9 @@ function stubLifecycleFetch(getDetail: () => unknown, handlers: LifecycleHandler
     if (url.pathname.endsWith('/take-over-review')) return handlers.takeOverReview ? handlers.takeOverReview() : jsonResponse(200, getDetail());
     if (url.pathname.endsWith('/close')) return handlers.close ? handlers.close() : jsonResponse(200, getDetail());
     if (url.pathname.endsWith('/cancel')) return handlers.cancel ? handlers.cancel() : jsonResponse(200, getDetail());
+    if (url.pathname.endsWith('/pdf')) {
+      return handlers.pdf ? handlers.pdf() : new Response(new Blob(['%PDF-1.6'], { type: 'application/pdf' }), { status: 200 });
+    }
     void init;
     return jsonResponse(200, getDetail());
   });
@@ -838,6 +842,275 @@ describe('ReturnDetailsPage', () => {
 
       await waitFor(() => expect(screen.getByText('Returns Page')).toBeInTheDocument());
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('closed-return PDF (Phase 9)', () => {
+    const CLOSED_DETAIL = {
+      ...DETAIL,
+      status: 'CLOSED',
+      reviewer: { id: ME_ID, fullName: 'Ada Admin' },
+      reviewStartedAt: '2026-08-06T04:00:00Z',
+      sellable: true,
+      creditCustomer: false,
+      chargeCustomer: true,
+      chargeDriver: false,
+      warehouseObservation: 'Checked twice.',
+      warehouseRepresentativeName: 'Wes Warehouse',
+      warehouseSignature: null as unknown,
+      closedBy: { id: ME_ID, fullName: 'Ada Admin' },
+      closedAt: '2026-08-06T06:00:00Z',
+    };
+
+    /** Captures what the transient download anchor was actually given, without depending on jsdom performing a real navigation. */
+    function captureDownloadClick() {
+      const captured: { href: string; download: string }[] = [];
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function mocked(this: HTMLAnchorElement) {
+        captured.push({ href: this.href, download: this.download });
+      });
+      return captured;
+    }
+
+    it('offers Download PDF and Print PDF only once the return is CLOSED', async () => {
+      stubLifecycleFetch(() => CLOSED_DETAIL);
+      renderReturnDetails();
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument());
+      expect(screen.getByRole('button', { name: 'Print PDF' })).toBeInTheDocument();
+      // The terminal warehouse record it prints is still rendered alongside it.
+      expect(screen.getByText('Checked twice.')).toBeInTheDocument();
+      expect(screen.getByText('Wes Warehouse')).toBeInTheDocument();
+    });
+
+    it('offers no PDF action while the return is still AWAITING_WAREHOUSE', async () => {
+      stubLifecycleFetch(() => DETAIL);
+      renderReturnDetails();
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Start Review' })).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Download PDF' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Print PDF' })).not.toBeInTheDocument();
+    });
+
+    it('offers no PDF action while the return is IN_REVIEW', async () => {
+      stubLifecycleFetch(() => ({ ...DETAIL, status: 'IN_REVIEW', reviewer: { id: ME_ID, fullName: 'Ada Admin' }, reviewStartedAt: '2026-08-06T04:00:00Z' }));
+      renderReturnDetails();
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Close Return' })).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Download PDF' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Print PDF' })).not.toBeInTheDocument();
+    });
+
+    it('offers no PDF action for a CANCELLED return', async () => {
+      stubLifecycleFetch(() => ({
+        ...DETAIL,
+        status: 'CANCELLED',
+        cancellationReason: 'Duplicate record',
+        cancelledBy: { id: ME_ID, fullName: 'Ada Admin' },
+        cancelledAt: '2026-08-06T07:00:00Z',
+      }));
+      renderReturnDetails();
+
+      await waitFor(() => expect(screen.getByText('Duplicate record')).toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Download PDF' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Print PDF' })).not.toBeInTheDocument();
+    });
+
+    it('downloads through the authenticated PDF endpoint and releases the object URL afterwards', async () => {
+      const fetchMock = stubLifecycleFetch(() => CLOSED_DETAIL);
+      const clicks = captureDownloadClick();
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Download PDF' }).click();
+      });
+
+      const pdfCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/pdf'));
+      if (!pdfCall) {
+        throw new Error('Expected a request to the PDF endpoint.');
+      }
+      const [pdfUrl, pdfInit] = pdfCall;
+      expect(String(pdfUrl)).toContain(`/admin/returns/${RETURN_ID}/pdf`);
+      // The bearer token travels in the header, never in the URL.
+      const headers = (pdfInit?.headers ?? {}) as Record<string, string>;
+      expect(headers.Authorization).toBe('Bearer test-access-token');
+      expect(String(pdfUrl)).not.toContain('test-access-token');
+
+      await waitFor(() => expect(clicks).toHaveLength(1));
+      expect(clicks[0].download).toBe('ReturnFlow-RF-000042.pdf');
+      expect(clicks[0].href).toBe('blob:mock-url');
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+
+      vi.restoreAllMocks();
+    });
+
+    it('blocks a second download while one is still in flight', async () => {
+      let releasePdf!: (response: Response) => void;
+      stubLifecycleFetch(() => CLOSED_DETAIL, {
+        pdf: () =>
+          new Promise<Response>((resolve) => {
+            releasePdf = resolve;
+          }),
+      });
+      const clicks = captureDownloadClick();
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Download PDF' }).click();
+      });
+
+      const pending = await screen.findByRole('button', { name: 'Preparing PDF…' });
+      expect(pending).toBeDisabled();
+      await act(async () => {
+        pending.click();
+      });
+      expect(clicks).toHaveLength(0);
+
+      await act(async () => {
+        releasePdf(new Response(new Blob(['%PDF-1.6'], { type: 'application/pdf' }), { status: 200 }));
+      });
+
+      await waitFor(() => expect(clicks).toHaveLength(1));
+      expect(screen.getByRole('button', { name: 'Download PDF' })).not.toBeDisabled();
+
+      vi.restoreAllMocks();
+    });
+
+    it('reports a safe error and never claims success when generation fails', async () => {
+      stubLifecycleFetch(() => CLOSED_DETAIL, {
+        pdf: () =>
+          jsonResponse(500, {
+            title: 'PDF Generation Failed',
+            detail: 'The return PDF could not be generated. Please try again.',
+            status: 500,
+          }),
+      });
+      const clicks = captureDownloadClick();
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Download PDF' }).click();
+      });
+
+      await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+      expect(screen.getByRole('alert')).toHaveTextContent('The return PDF could not be generated. Please try again.');
+      expect(clicks).toHaveLength(0);
+      // Back to idle so the admin can retry, not stuck on "Preparing".
+      expect(screen.getByRole('button', { name: 'Download PDF' })).not.toBeDisabled();
+
+      vi.restoreAllMocks();
+    });
+
+    it('Print opens the authenticated PDF in a new tab, with no token in the opened URL', async () => {
+      const fetchMock = stubLifecycleFetch(() => CLOSED_DETAIL);
+      const openSpy = vi.fn(() => ({ opener: {} }) as unknown as Window);
+      vi.stubGlobal('open', openSpy);
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Print PDF' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Print PDF' }).click();
+      });
+
+      const pdfCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/pdf'));
+      if (!pdfCall) {
+        throw new Error('Expected a request to the PDF endpoint.');
+      }
+      const [pdfUrl, pdfInit] = pdfCall;
+      expect(String(pdfUrl)).toContain(`/admin/returns/${RETURN_ID}/pdf`);
+      const headers = (pdfInit?.headers ?? {}) as Record<string, string>;
+      expect(headers.Authorization).toBe('Bearer test-access-token');
+
+      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      const [openedUrl, target] = openSpy.mock.calls[0] as unknown as [string, string];
+      // The tab receives an object URL for the already-fetched bytes — never
+      // the API endpoint, and never a token of any kind.
+      expect(openedUrl).toBe('blob:mock-url');
+      expect(target).toBe('_blank');
+      expect(openedUrl).not.toContain('test-access-token');
+      expect(openedUrl).not.toContain('/admin/returns');
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+      // Deliberately still alive: revoking before the tab loads would break it.
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('blocks a second Print while one is still in flight, without disabling Download', async () => {
+      let releasePdf!: (response: Response) => void;
+      stubLifecycleFetch(() => CLOSED_DETAIL, {
+        pdf: () =>
+          new Promise<Response>((resolve) => {
+            releasePdf = resolve;
+          }),
+      });
+      const openSpy = vi.fn(() => ({ opener: {} }) as unknown as Window);
+      vi.stubGlobal('open', openSpy);
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Print PDF' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Print PDF' }).click();
+      });
+
+      const pending = await screen.findByRole('button', { name: 'Preparing PDF…' });
+      expect(pending).toBeDisabled();
+      // Download stays usable — the two actions have independent state.
+      expect(screen.getByRole('button', { name: 'Download PDF' })).not.toBeDisabled();
+      await act(async () => {
+        pending.click();
+      });
+      expect(openSpy).not.toHaveBeenCalled();
+
+      await act(async () => {
+        releasePdf(new Response(new Blob(['%PDF-1.6'], { type: 'application/pdf' }), { status: 200 }));
+      });
+
+      await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1));
+      expect(screen.getByRole('button', { name: 'Print PDF' })).not.toBeDisabled();
+    });
+
+    it('Print reports a safe error when generation fails', async () => {
+      stubLifecycleFetch(() => CLOSED_DETAIL, {
+        pdf: () =>
+          jsonResponse(500, {
+            title: 'PDF Generation Failed',
+            detail: 'The return PDF could not be generated. Please try again.',
+            status: 500,
+          }),
+      });
+      const openSpy = vi.fn(() => ({ opener: {} }) as unknown as Window);
+      vi.stubGlobal('open', openSpy);
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Print PDF' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Print PDF' }).click();
+      });
+
+      await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+      expect(screen.getByRole('alert')).toHaveTextContent('The return PDF could not be generated. Please try again.');
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Print PDF' })).not.toBeDisabled();
+    });
+
+    it('Print says so when the browser blocks the new tab, instead of appearing to do nothing', async () => {
+      stubLifecycleFetch(() => CLOSED_DETAIL);
+      // A blocked pop-up is exactly what `window.open` returning null means.
+      vi.stubGlobal('open', vi.fn(() => null));
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Print PDF' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Print PDF' }).click();
+      });
+
+      await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+      expect(screen.getByRole('alert')).toHaveTextContent('Your browser blocked the new tab.');
+      // The unusable object URL is released immediately in this case.
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
     });
   });
 });
