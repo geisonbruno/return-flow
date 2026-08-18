@@ -85,6 +85,19 @@
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>3.0.3</version>
 		</dependency>
+		<!--
+			Apache PDFBox — Apache License 2.0 (verified in the artifact's own
+			META-INF/LICENSE and NOTICE), so it is compatible with commercial
+			SaaS use, unlike the AGPL/commercial-dual-licensed alternatives.
+			Used only for server-side, on-demand administrative PDF generation
+			(com.returnflow.pdf). Not managed by the Spring Boot parent, so the
+			version is pinned explicitly here.
+		-->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.8</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

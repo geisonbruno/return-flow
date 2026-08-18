@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import com.returnflow.pdf.ReturnPdfGenerationException;
+
 /**
  * ADMIN-return-specific {@code ProblemDetail} mapping, added on top of the
  * shared {@link com.returnflow.common.error.GlobalExceptionHandler} rather
@@ -59,6 +61,19 @@ class AdminReturnExceptionHandler {
 			problem.setProperty("currentReviewerName", currentReviewerName);
 		}
 		return problem;
+	}
+
+	/**
+	 * A rendering/IO failure while building the administrative PDF (Phase 9).
+	 * Deliberately mapped here rather than left to
+	 * {@code GlobalExceptionHandler}'s blanket fallback, so the response names
+	 * the failing capability without leaking the underlying cause — the stack
+	 * trace stays in the logs.
+	 */
+	@ExceptionHandler(ReturnPdfGenerationException.class)
+	ProblemDetail handleReturnPdfGeneration() {
+		return problem(HttpStatus.INTERNAL_SERVER_ERROR, "PDF Generation Failed",
+				"The return PDF could not be generated. Please try again.");
 	}
 
 	@ExceptionHandler(InvalidReturnFilterException.class)

@@ -6,6 +6,7 @@ import {
   fetchDashboardSummary,
   fetchMediaBlob,
   fetchReturnDetail,
+  fetchReturnPdf,
   fetchReturns,
   fetchRoutes,
   fetchUsers,
@@ -179,5 +180,23 @@ export function useCancelReturn(returnId: string) {
   return useMutation({
     mutationFn: (reason: string) => cancelReturn(returnId, reason),
     onSuccess: (detail) => afterLifecycleChange(queryClient, returnId, detail),
+  });
+}
+
+/**
+ * Requesting the administrative PDF is a read, not a lifecycle transition —
+ * so unlike every mutation above it invalidates nothing and writes nothing to
+ * the cache. It is a `useMutation` purely because it is user-triggered rather
+ * than render-driven, which also gives each caller its own `isPending` guard
+ * against a second request while one is already in flight. The `Blob` is
+ * deliberately not cached: it would pin several hundred KB per viewed return
+ * in memory for no benefit.
+ *
+ * <p>Called once per action (Download and Print), so each button gets an
+ * independent pending state and neither can disable the other.
+ */
+export function useReturnPdf(returnId: string) {
+  return useMutation({
+    mutationFn: () => fetchReturnPdf(returnId),
   });
 }

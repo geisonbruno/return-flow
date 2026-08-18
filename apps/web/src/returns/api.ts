@@ -100,3 +100,15 @@ export function closeReturn(returnId: string, payload: CloseReturnPayload): Prom
 export function cancelReturn(returnId: string, reason: string): Promise<AdminReturnDetail> {
   return authorizedRequestJson<AdminReturnDetail>(`/admin/returns/${returnId}/cancel`, { method: 'POST', body: { reason } });
 }
+
+/**
+ * The Phase 9 administrative PDF for a closed return. Fetched as an
+ * authenticated `Blob` through the same bearer-token client every other
+ * request uses — never a plain link, `window.open`, or a token in the URL,
+ * none of which can carry the memory-only access token. The request sends
+ * nothing but the return ID: the backend builds the document from the
+ * database, so no value displayed here can influence it.
+ */
+export function fetchReturnPdf(returnId: string): Promise<Blob> {
+  return authorizedRequestBlob(`/admin/returns/${returnId}/pdf`);
+}

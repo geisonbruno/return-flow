@@ -7,6 +7,7 @@ import { AuthenticatedImage } from '../components/AuthenticatedImage';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorState } from '../components/ErrorState';
 import { LoadingState } from '../components/LoadingState';
+import { ReturnPdfAction } from '../components/ReturnPdfAction';
 import { StatusBadge } from '../components/StatusBadge';
 import { WarehouseSignaturePad, type WarehouseSignaturePadHandle } from '../components/WarehouseSignaturePad';
 import { YesNoField } from '../components/YesNoField';
@@ -577,7 +578,15 @@ function ReturnDetailsContent({
           </>
         )}
 
-        {detail.status === 'CLOSED' && <ClosedWarehouseSummary detail={detail} />}
+        {detail.status === 'CLOSED' && (
+          <>
+            <ClosedWarehouseSummary detail={detail} />
+            {/* Sits directly under the terminal warehouse record it prints,
+                and only for CLOSED — a return still awaiting review, in
+                review, or cancelled has no administrative PDF. */}
+            <ReturnPdfAction returnId={detail.id} returnNumber={detail.returnNumber} />
+          </>
+        )}
         {detail.status === 'CANCELLED' && <CancelledSummary detail={detail} />}
       </section>
     </div>
