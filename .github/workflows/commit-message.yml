@@ -1,0 +1,45 @@
+name: Commit Message
+
+# Governance check: every non-merge commit in a Pull Request must carry a
+# descriptive body, not just a subject and generated trailers.
+#
+# Deliberately no `paths:` filter — the policy applies to every Pull Request
+# regardless of which files it touches.
+#
+# Pull requests only: this check exists to validate the commits a Pull Request
+# introduces, and it reads the base/head SHAs from the pull_request event. A
+# manual trigger has no such range, so supporting one would mean inventing a
+# fallback that validates something other than what the check is for.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commit-message-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commit-message:
+    name: Commit Message CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the Pull Request's base and head commits are both
+          # present locally and their range can be walked.
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The explicit base..head range is deliberate: the synthetic merge
+          # commit would also pull in commits that came from `main` and were
+          # never authored on this branch.
+          bash scripts/validate-commit-messages.sh "$BASE_SHA" "$HEAD_SHA"

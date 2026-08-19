@@ -38,7 +38,73 @@ Examples: `feat/phase-5b-customer-signature`, `fix/web-photo-upload`, `chore/ci-
 - A failed required check blocks merge.
 - Database migrations are forward-only; a migration is never edited after it merges.
 - One focused task should normally produce one focused commit.
+- Every non-merge commit needs a descriptive body explaining what changed and why; trailers are not a body (see Commit messages).
 - Unrelated refactoring must not be mixed into feature work — open a separate `chore`/`fix` task instead.
+
+## Commit messages
+
+Git is this project's permanent historical record. A commit must be understandable a year later without opening its diff, so **every non-merge commit needs a descriptive body**, not just a subject and generated trailers.
+
+### Required format
+
+```text
+type(scope): concise subject
+
+Short explanation of what changed and why it changed.
+
+Optional additional paragraph when it genuinely helps a future reader.
+
+Co-Authored-By: ...
+Claude-Session: ...
+```
+
+Rules:
+
+- The subject follows the project's existing Conventional Commit style: `type(scope): description`, or `type: description` when a scope adds nothing. Common types are `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `build`, `ci`, `perf`, `style`, and `revert`.
+- **A blank line must separate the subject from the body.**
+- **The body must contain real prose.** Trailer lines (`Co-Authored-By:`, `Signed-off-by:`, `Reviewed-by:`, `Claude-Session:`, `Change-Id:`, …) are metadata and do not count as description.
+- Focus the body on *what changed* and *why*, plus a materially important trade-off when one exists.
+- Keep it concise — a few useful lines, not a PR-sized essay or a changelog. Keep commits focused so a short body is enough.
+- **Generated merge commits are exempt**, since they are integration metadata rather than authored work.
+
+### Passing example
+
+```text
+fix(web): preserve return filters on navigation
+
+Keep the active return-list query parameters when navigating back from
+Return Details so operators do not lose their current working context.
+
+Co-Authored-By: Someone <someone@example.com>
+```
+
+### Failing example
+
+```text
+feat(api): add feature
+
+Co-Authored-By: Someone <someone@example.com>
+Claude-Session: example
+```
+
+This fails because the trailers are the entire body — nothing explains what the feature is or why it exists.
+
+### Validating locally
+
+```bash
+# Check your branch against main before opening a Pull Request
+scripts/validate-commit-messages.sh origin/main HEAD
+```
+
+The script names each offending commit and why it failed: missing subject, missing blank separator, missing descriptive body, or a body below the minimum length. It is dependency-free — Git and shell only. `scripts/test-validate-commit-messages.sh` covers its behavior.
+
+### Automated validation
+
+`Commit Message CI` (`.github/workflows/commit-message.yml`) runs the same validator on every Pull Request targeting `main`, over the real base..head range. It has no path filter, so it always reports.
+
+**It is a validation check, not a merge gate.** It reports whether the commit-message policy was followed; it is deliberately not one of the required status checks on `main`, which remain `Backend CI`, `Web CI`, and `Mobile CI`. A failure is a signal to fix the commit message, and the policy in root `CLAUDE.md` §39.7 is what makes it mandatory.
+
+This policy applies to new commits only. Existing history is not rewritten.
 
 ## Continuous integration
 
@@ -49,6 +115,8 @@ Three independent workflows, one per application:
 | `.github/workflows/backend.yml` | `Backend CI` | `apps/api/**`, itself | `mvnw package` (runs the full backend suite, then builds the jar) |
 | `.github/workflows/web.yml` | `Web CI` | `apps/web/**`, itself | `npm ci`, lint, typecheck, tests, production build |
 | `.github/workflows/mobile.yml` | `Mobile CI` | `apps/mobile/**`, itself | `npm ci`, typecheck, lint, tests |
+
+Alongside these, `.github/workflows/commit-message.yml` runs `Commit Message CI` on every Pull Request with no path filter, validating the commit-message policy (see Commit messages). It is not one of the required status checks on `main`.
 
 These replaced the earlier combined `ci.yml`, which ran Backend CI and Mobile CI on *every* change — including documentation-only ones. The job names `Backend CI` and `Mobile CI` were kept identical across that split so any existing required-check configuration keeps working; `Web CI` is a new stable name, replacing the incidental `build-and-test`.
 
