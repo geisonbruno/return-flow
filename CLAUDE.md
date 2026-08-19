@@ -1600,7 +1600,7 @@ Rules:
 - An implementation task still stops **Pending Review** without creating a commit, exactly as described above — only now that stop happens on the feature branch, not on `main`.
 - A separate, explicit approval prompt creates the commit, on that same feature branch.
 - Pushing the branch, opening a Pull Request, merging, tagging, and deploying each require explicit developer instruction in that specific task — none of them happen automatically after a commit is created.
-- Backend CI and Mobile CI (`.github/workflows/ci.yml`) must pass before a Pull Request merges into `main`. Mobile CI currently runs `npm ci`, tests, typecheck, and lint — all blocking.
+- CI is one path-filtered workflow per application — `Backend CI` (`.github/workflows/backend.yml`), `Web CI` (`web.yml`), and `Mobile CI` (`mobile.yml`) — so a change to one application does not run the others' checks. Whichever checks a Pull Request triggers must pass before it merges into `main`, and every step is blocking. No CI workflow may use a secret, write to the repository, or deploy.
 - Expo Doctor is a manual dependency-health check, run during focused maintenance tasks, not a CI step — until it is safely restored to CI, it must not be added back as a permanent warning-only or always-passing check.
 - Dependency-version drift must not be corrected with `--force` or `--legacy-peer-deps` without explicit developer approval for that specific change.
 - `docs/DEVELOPMENT_WORKFLOW.md` is the source of truth for the Git branching, commit, and Pull Request workflow; this section only summarizes it.

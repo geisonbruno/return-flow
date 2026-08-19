@@ -2,8 +2,11 @@
 
 A multi-tenant return-management platform for delivery and warehouse operations.
 
-[![CI](https://github.com/geisonbruno/return-flow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/geisonbruno/return-flow/actions/workflows/ci.yml)
+[![Backend CI](https://github.com/geisonbruno/return-flow/actions/workflows/backend.yml/badge.svg?branch=main)](https://github.com/geisonbruno/return-flow/actions/workflows/backend.yml)
+[![Web CI](https://github.com/geisonbruno/return-flow/actions/workflows/web.yml/badge.svg?branch=main)](https://github.com/geisonbruno/return-flow/actions/workflows/web.yml)
+[![Mobile CI](https://github.com/geisonbruno/return-flow/actions/workflows/mobile.yml/badge.svg?branch=main)](https://github.com/geisonbruno/return-flow/actions/workflows/mobile.yml)
 ![Java 21](https://img.shields.io/badge/backend-Java%2021-blue)
+![Node 22](https://img.shields.io/badge/web-Node%2022-blue)
 ![Node 20.19.4](https://img.shields.io/badge/mobile-Node%2020.19.4-blue)
 ![Expo SDK 57](https://img.shields.io/badge/mobile-Expo%20SDK%2057-blue)
 ![Status](https://img.shields.io/badge/status-MVP%20%2F%20active%20development-orange)
@@ -91,7 +94,24 @@ npm run typecheck
 npm run lint
 ```
 
-GitHub Actions runs **Backend CI** and **Mobile CI** as required checks on every Pull Request to `main`.
+## Building
+
+```powershell
+# Backend — runs the full test suite, then builds target/api-0.0.1-SNAPSHOT.jar
+cd apps/api
+.\mvnw.cmd package
+
+# Web — production static assets in dist/
+cd apps/web
+npm ci
+npm run lint; npm run typecheck; npm test; npm run build
+```
+
+Java 21 and the Maven Wrapper cover the backend, so no globally installed Maven is needed. No IDE is required for any build.
+
+GitHub Actions runs three independent, path-filtered workflows on every Pull Request to `main` — **Backend CI**, **Web CI**, and **Mobile CI** — so a change to one application does not run the others' checks.
+
+Toolchain versions, build outputs, and every environment variable each application reads are documented in [`docs/BUILD_AND_ENVIRONMENT.md`](docs/BUILD_AND_ENVIRONMENT.md). No secret is ever committed, and CI requires none.
 
 ## Roadmap
 
@@ -108,4 +128,5 @@ ReturnFlow is a private, actively developed MVP — not production-ready and not
 - [`apps/mobile/README.md`](apps/mobile/README.md) — mobile setup and manual walkthrough
 - [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — phase-by-phase roadmap and acceptance criteria
 - [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) — branching, CI, and release process
+- [`docs/BUILD_AND_ENVIRONMENT.md`](docs/BUILD_AND_ENVIRONMENT.md) — build commands, toolchain versions, and environment variables
 - [`PROGRESS.md`](PROGRESS.md) — current implementation status

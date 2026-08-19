@@ -14,7 +14,7 @@ npm run test        # jest (jest-expo preset)
 
 Copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_BASE_URL` to point at the local API.
 
-> Requires Node >=20.19.4 (or >=22.12) — the Expo CLI enforces this minimum for `expo start`/`expo lint`. This project standardizes on **Node 20.19.4** (see `.nvmrc`, also used by `Mobile CI` in `.github/workflows/ci.yml`) — the lowest version that satisfies Expo SDK 57's requirement, so the local runtime stays on the same Node 20.x line already in use rather than jumping to a newer major. Run `nvm use` if you use nvm. **The local dev machine on this repository currently runs Node 20.18.0 and still needs a manual upgrade to 20.19.4** — that upgrade is outside this repository's files and hasn't been done yet.
+> Requires Node >=20.19.4 (or >=22.12) — the Expo CLI enforces this minimum for `expo start`/`expo lint`. This project standardizes on **Node 20.19.4** (see `.nvmrc`, also used by `Mobile CI` in `.github/workflows/mobile.yml`) — the lowest version that satisfies Expo SDK 57's requirement, so the local runtime stays on the same Node 20.x line already in use rather than jumping to a newer major. Run `nvm use` if you use nvm. **The local dev machine on this repository currently runs Node 20.18.0 and still needs a manual upgrade to 20.19.4** — that upgrade is outside this repository's files and hasn't been done yet.
 
 ## Dependency health (Expo Doctor)
 

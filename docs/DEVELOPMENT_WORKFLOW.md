@@ -13,7 +13,7 @@ This document is the source of truth for how work moves from a task into `main`:
 5. A separate, explicit approval prompt creates the commit on that branch.
 6. The developer pushes the feature branch.
 7. The developer opens a Pull Request targeting `main`.
-8. GitHub Actions runs the two required checks on the Pull Request: **Backend CI** (`mvnw package`, which runs the full backend test suite first) and **Mobile CI** (`npm ci`, then typecheck, lint, and tests — all blocking).
+8. GitHub Actions runs the checks that apply to what the branch actually changed — **Backend CI**, **Web CI**, and/or **Mobile CI** (see Continuous integration below). All are blocking.
 9. Any failure is corrected on the same branch — never by reopening a new one for the same task.
 10. The Pull Request is merged only after the required checks pass.
 11. The merged feature branch is deleted.
@@ -40,9 +40,50 @@ Examples: `feat/phase-5b-customer-signature`, `fix/web-photo-upload`, `chore/ci-
 - One focused task should normally produce one focused commit.
 - Unrelated refactoring must not be mixed into feature work — open a separate `chore`/`fix` task instead.
 
+## Continuous integration
+
+Three independent workflows, one per application:
+
+| Workflow | Check name | Expensive validation runs when these paths changed | What it runs |
+|---|---|---|---|
+| `.github/workflows/backend.yml` | `Backend CI` | `apps/api/**`, itself | `mvnw package` (runs the full backend suite, then builds the jar) |
+| `.github/workflows/web.yml` | `Web CI` | `apps/web/**`, itself | `npm ci`, lint, typecheck, tests, production build |
+| `.github/workflows/mobile.yml` | `Mobile CI` | `apps/mobile/**`, itself | `npm ci`, typecheck, lint, tests |
+
+These replaced the earlier combined `ci.yml`, which ran Backend CI and Mobile CI on *every* change — including documentation-only ones. The job names `Backend CI` and `Mobile CI` were kept identical across that split so any existing required-check configuration keeps working; `Web CI` is a new stable name, replacing the incidental `build-and-test`.
+
+### How path filtering and required checks work together
+
+**All three workflows start for every Pull Request targeting `main`, so all three checks always report a result.** Only the validation itself is conditional.
+
+This matters because of how GitHub behaves in two different situations:
+
+- A workflow that never starts — because a workflow-level `paths:` filter excluded it — never reports. A required check in that state stays pending forever and blocks the Pull Request.
+- A step or job skipped *inside* a workflow that did start still reports a successful conclusion, which satisfies a required check.
+
+So the Pull Request triggers carry no `paths:` filter. Instead, each workflow's first step compares the Pull Request's real base and head SHAs (`git diff --name-only`, using `github.event.pull_request.base.sha` and `.head.sha` rather than the synthetic merge commit, which would also surface changes that came from `main`). If nothing relevant changed, the job logs a short "validation not required" line and finishes successfully without installing a toolchain or running a suite.
+
+The result:
+
+| Pull Request touches | `Backend CI` | `Web CI` | `Mobile CI` |
+|---|---|---|---|
+| `apps/api/**` only | full validation | reports success, no work | reports success, no work |
+| `apps/web/**` only | reports success, no work | full validation | reports success, no work |
+| `apps/mobile/**` only | reports success, no work | reports success, no work | full validation |
+| more than one application | each affected application runs its full validation | | |
+| documentation only | reports success, no work | reports success, no work | reports success, no work |
+
+**Push to `main` keeps a workflow-level `paths:` filter.** Required-check reporting is a Pull Request concern, so there is nothing to gain from starting a workflow for an unrelated push. A manual `workflow_dispatch` always runs the real validation.
+
+No third-party path-filter action is used — the detection is a few lines of `git diff` and `grep`.
+
+Each workflow uses least privilege (`permissions: contents: read`), cancels only its own superseded runs, and uses only the official `actions/checkout`, `actions/setup-java`, and `actions/setup-node` actions with their built-in dependency caching. **No workflow uses any secret, writes to the repository, or deploys anything.**
+
+Build commands, toolchain versions, and every environment variable each application reads are documented in [`docs/BUILD_AND_ENVIRONMENT.md`](BUILD_AND_ENVIRONMENT.md).
+
 ## Dependency health (Expo Doctor)
 
-`npx expo-doctor` (`apps/mobile`) is a maintenance check, not a required CI check. It is deliberately **not** run in `.github/workflows/ci.yml` — a permanently-informational, always-passing CI step was considered and rejected, since a check that can never fail the build isn't providing real signal, and `Mobile CI` should only contain steps that block meaningfully.
+`npx expo-doctor` (`apps/mobile`) is a maintenance check, not a required CI check. It is deliberately **not** run in `.github/workflows/mobile.yml` — a permanently-informational, always-passing CI step was considered and rejected, since a check that can never fail the build isn't providing real signal, and `Mobile CI` should only contain steps that block meaningfully.
 
 Run it manually:
 
@@ -56,14 +97,15 @@ The project currently reports 17/18 (Expo-managed dependency-version drift; see 
 
 ## Main branch protection
 
-Branch protection is **not** configured yet. It must be configured manually, in the GitHub repository settings, after the CI workflow (`.github/workflows/ci.yml`) has run successfully at least once — GitHub only offers a status check as a selectable required check after it has reported at least one result.
+Branch protection is **not** configured yet. It must be configured manually, in the GitHub repository settings, after each workflow has run successfully at least once — GitHub only offers a status check as a selectable required check after it has reported at least one result.
 
 Recommended rules for this solo-developed MVP (target branch: `main`):
 
 - Require a Pull Request before merging.
 - Do **not** require an approving review while there is only one repository developer — introduce this once a second collaborator joins.
-- Require status checks to pass before merging:
+- Require these status checks to pass before merging:
   - `Backend CI`
+  - `Web CI`
   - `Mobile CI`
 - Block force pushes to `main`.
 - Block branch deletion for `main`.
@@ -73,6 +115,8 @@ Recommended rules for this solo-developed MVP (target branch: `main`):
 - Do **not** require a merge queue yet — unnecessary at this repository's current change volume.
 - Do **not** require deployment checks — no deployment exists yet.
 - Do **not** require CODEOWNERS — unnecessary with one developer.
+
+All three are safe to require: every one of these workflows starts for every Pull Request targeting `main`, so each always reports a result even when its application was untouched (see Continuous integration above). There is no "required but never reported" deadlock to work around, and no reason to routinely bypass a check as an administrator.
 
 These settings have not been enabled as of this document. Treat this section as instructions for the next manual configuration step, not a record of what is already active.
 

@@ -1,17 +1,17 @@
-name: Web
+name: Mobile
 
 # See .github/workflows/backend.yml for the full rationale behind this shape.
 # In short: Pull Requests deliberately have no workflow-level `paths:` filter,
-# so this workflow always starts and `Web CI` always reports a result — which is
-# what makes it safe to mark as a required check. The job itself decides whether
-# the expensive validation is needed by comparing the Pull Request's real base
-# and head SHAs.
+# so this workflow always starts and `Mobile CI` always reports a result — which
+# is what makes it safe to mark as a required check. The job itself decides
+# whether the expensive validation is needed by comparing the Pull Request's
+# real base and head SHAs.
 on:
   push:
     branches: [main]
     paths:
-      - "apps/web/**"
-      - ".github/workflows/web.yml"
+      - "apps/mobile/**"
+      - ".github/workflows/mobile.yml"
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -20,19 +20,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: web-${{ github.event.pull_request.number || github.ref }}
+  group: mobile-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  web:
-    # Named explicitly so branch protection has a stable check to require —
-    # previously this reported as the incidental job id `build-and-test`.
-    name: Web CI
+  mobile:
+    name: Mobile CI
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: apps/web
+        working-directory: apps/mobile
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +39,7 @@ jobs:
           # present locally for the comparison below.
           fetch-depth: 0
 
-      - name: Detect web changes
+      - name: Detect mobile changes
         id: changes
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -63,45 +61,48 @@ jobs:
           # match into a failed pipeline, silently skipping validation that was
           # actually required. Reading a file removes that race entirely.
           git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
-          if grep -Eq '^(apps/web/|\.github/workflows/web\.yml$)' "$RUNNER_TEMP/changed-files.txt"; then
+          if grep -Eq '^(apps/mobile/|\.github/workflows/mobile\.yml$)' "$RUNNER_TEMP/changed-files.txt"; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
             echo "relevant=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: No web changes
+      - name: No mobile changes
         if: steps.changes.outputs.relevant != 'true'
-        run: echo "No web changes — Web CI validation not required."
+        run: echo "No mobile changes — Mobile CI validation not required."
 
-      # Node 22 (current LTS) is what this workflow has been validated on since
-      # the web app was introduced. Unlike mobile, the web app has no Expo SDK
-      # constraint pinning it to an exact patch, so the major is enough.
-      - name: Set up Node
+      # Node version comes from apps/mobile/.nvmrc (currently 20.19.4), so the
+      # local toolchain and CI read the same single source.
+      - name: Set up Node.js
         if: steps.changes.outputs.relevant == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: apps/mobile/.nvmrc
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: apps/mobile/package-lock.json
 
       - name: Install dependencies
         if: steps.changes.outputs.relevant == 'true'
         run: npm ci
 
-      - name: Lint
-        if: steps.changes.outputs.relevant == 'true'
-        run: npm run lint
-
       - name: Typecheck
         if: steps.changes.outputs.relevant == 'true'
         run: npm run typecheck
 
+      - name: Lint
+        if: steps.changes.outputs.relevant == 'true'
+        run: npm run lint
+
       - name: Test
         if: steps.changes.outputs.relevant == 'true'
-        run: npm run test
-
-      # Produces the deployable static assets in apps/web/dist. Nothing is
-      # published here — Phase 10A verifies the build, it does not deploy.
-      - name: Build
-        if: steps.changes.outputs.relevant == 'true'
-        run: npm run build
+        # --runInBand: this suite pays a one-time React Native native-mock/module
+        # initialization cost on each test file's first render() (see
+        # PROGRESS.md's Phase 4.1 note on the same pattern in
+        # ReturnListScreen.test.tsx). Under Jest's default parallel workers,
+        # GitHub's standard (2-core) runners let enough of those first renders
+        # land at the same moment to occasionally exceed Jest's 5000ms default
+        # test timeout — not reproducible locally on more capable hardware, and
+        # not a production or test-logic defect. Running in-band serializes
+        # those first-render costs so they never compete for CPU, removing
+        # worker contention as a variable entirely.
+        run: npm test -- --ci --runInBand
