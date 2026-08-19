@@ -97,28 +97,26 @@ The project currently reports 17/18 (Expo-managed dependency-version drift; see 
 
 ## Main branch protection
 
-Branch protection is **not** configured yet. It must be configured manually, in the GitHub repository settings, after each workflow has run successfully at least once — GitHub only offers a status check as a selectable required check after it has reported at least one result.
+`main` is protected by a repository **ruleset**, configured once `Backend CI`, `Web CI`, and `Mobile CI` had each reported at least one result — GitHub only offers a status check as selectable after that.
 
-Recommended rules for this solo-developed MVP (target branch: `main`):
+Active rules for `main`:
 
-- Require a Pull Request before merging.
-- Do **not** require an approving review while there is only one repository developer — introduce this once a second collaborator joins.
-- Require these status checks to pass before merging:
+- A Pull Request is required; no direct pushes.
+- These status checks must pass before merging:
   - `Backend CI`
   - `Web CI`
   - `Mobile CI`
-- Block force pushes to `main`.
-- Block branch deletion for `main`.
-- Require conversation resolution before merging.
-- Apply the rules to repository administrators too, where the GitHub plan allows it.
-- Do **not** require signed commits yet.
-- Do **not** require a merge queue yet — unnecessary at this repository's current change volume.
-- Do **not** require deployment checks — no deployment exists yet.
-- Do **not** require CODEOWNERS — unnecessary with one developer.
+- Required approvals: **0**, for the current single-developer MVP workflow.
+- Force pushes are blocked.
+- Branch deletion is restricted.
+- **"Require branches to be up to date before merging" is intentionally disabled**, trading a small risk of semantic conflict for not re-running every check after each intervening merge.
+- No bypass is intended for the normal workflow.
 
-All three are safe to require: every one of these workflows starts for every Pull Request targeting `main`, so each always reports a result even when its application was untouched (see Continuous integration above). There is no "required but never reported" deadlock to work around, and no reason to routinely bypass a check as an administrator.
+Requiring all three checks is safe specifically because every one of these workflows starts for every Pull Request targeting `main`, so each always reports a result even when its application was untouched (see Continuous integration above). There is no "required but never reported" deadlock, and no reason to routinely bypass a check as an administrator.
 
-These settings have not been enabled as of this document. Treat this section as instructions for the next manual configuration step, not a record of what is already active.
+Two settings are deliberately relaxed and should be revisited when the team grows: **required approvals** becomes meaningful only with a second developer (self-approval is not review), and the branch-up-to-date requirement becomes worth its cost as merge volume rises.
+
+Still deliberately not enabled: signed commits, a merge queue (unnecessary at this change volume), deployment checks (no deployment exists yet), and CODEOWNERS (unnecessary with one developer).
 
 ## Local Development Startup
 
