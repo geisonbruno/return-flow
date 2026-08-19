@@ -1,0 +1,110 @@
+name: Backend
+
+# One workflow per application (Phase 10A), so a change to one application does
+# not run the others' suites.
+#
+# Pull requests deliberately have NO workflow-level `paths:` filter. A workflow
+# that never starts never reports, and GitHub treats a required-but-unreported
+# check as permanently pending — which would block every Pull Request that
+# doesn't touch this application. Instead this workflow always starts for a
+# Pull Request, and the job itself decides whether the expensive validation is
+# needed, using a plain `git diff` against the Pull Request's real base and head
+# SHAs. A skipped step inside a job that did start still reports success, so
+# `Backend CI` can safely be a required check.
+#
+# Push to `main` keeps a workflow-level `paths:` filter: required-check
+# reporting is a Pull Request concern, so there is nothing to gain from starting
+# this workflow for an unrelated push.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Scoped to this workflow only, so a superseded backend run cancels its own
+# predecessor without touching an unrelated web or mobile run.
+concurrency:
+  group: backend-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the Pull Request's base and head SHAs are both
+          # present locally for the comparison below.
+          fetch-depth: 0
+
+      - name: Detect backend changes
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # A push (already path-filtered above) or a manual run always
+          # validates for real — only a Pull Request is filtered here.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The explicit base..head comparison is deliberate: diffing the
+          # synthetic merge commit instead would also report changes coming
+          # from `main`, which this branch did not make.
+          #
+          # The diff is written to a file rather than piped straight into grep.
+          # These steps run under `pipefail`, and `grep -q` stops at its first
+          # match — which can leave `git` killed by SIGPIPE and turn a genuine
+          # match into a failed pipeline, silently skipping validation that was
+          # actually required. Reading a file removes that race entirely.
+          git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          if grep -Eq '^(apps/api/|\.github/workflows/backend\.yml$)' "$RUNNER_TEMP/changed-files.txt"; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: No backend changes
+        if: steps.changes.outputs.relevant != 'true'
+        run: echo "No backend changes — Backend CI validation not required."
+
+      - name: Set up JDK 21 (Temurin)
+        if: steps.changes.outputs.relevant == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+
+      - name: Make Maven wrapper executable
+        if: steps.changes.outputs.relevant == 'true'
+        run: chmod +x mvnw
+
+      # `package` already runs the full `test` phase first in Maven's default
+      # lifecycle, so this both proves the test suite and produces the
+      # package in a single invocation — a separate `mvnw test` step would
+      # just re-run the same tests a second time.
+      #
+      # No PostgreSQL service container and no credentials are configured on
+      # purpose: the integration tests own their own database lifecycle
+      # through Testcontainers, which uses the Docker daemon already present
+      # on `ubuntu-latest`. Adding a service container would give the tests a
+      # second, unused database.
+      - name: Test and package
+        if: steps.changes.outputs.relevant == 'true'
+        run: ./mvnw --batch-mode --no-transfer-progress package
