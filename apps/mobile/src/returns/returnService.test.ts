@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { authorizedMultipartRequest, authorizedRequestJson } from '../api/apiClient';
@@ -6,6 +7,27 @@ import type { NormalizedPhoto } from './photoNormalization';
 import type { CreateReturnSignaturePayload } from './types';
 
 jest.mock('../api/apiClient');
+
+/**
+ * Stands in for the native `expo-file-system` module, mirroring the only two
+ * things the upload path depends on: `File` is constructed from a local URI,
+ * and it satisfies the `Blob` interface (including `bytes()`) that the
+ * multipart encoder in `expo/fetch` requires to read a part's content.
+ */
+jest.mock('expo-file-system', () => ({
+  File: class MockExpoFile extends Blob {
+    readonly uri: string;
+    readonly name: string;
+    constructor(uri: string) {
+      super([], { type: 'image/jpeg' });
+      this.uri = uri;
+      this.name = uri.split('/').pop() ?? '';
+    }
+    bytes(): Promise<Uint8Array<ArrayBuffer>> {
+      return Promise.resolve(new Uint8Array(new ArrayBuffer(3)));
+    }
+  },
+}));
 
 const NORMALIZED: NormalizedPhoto = {
   uri: 'file:///tmp/normalized.jpg',
@@ -39,7 +61,7 @@ describe('uploadReturnPhoto — native', () => {
     expect(authorizedMultipartRequest).toHaveBeenCalledWith('/api/v1/driver/returns/return-1/photos', expect.any(FormData));
   });
 
-  it('sends exactly one multipart field named "file", using the RN { uri, name, type } file representation unchanged', async () => {
+  it('sends exactly one multipart field named "file", built from the normalized image URI', async () => {
     (authorizedMultipartRequest as jest.Mock).mockResolvedValue({ id: 'photo-1' });
     const appendSpy = jest.spyOn(FormData.prototype, 'append');
 
@@ -48,7 +70,26 @@ describe('uploadReturnPhoto — native', () => {
     expect(appendSpy).toHaveBeenCalledTimes(1);
     const [fieldName, value] = appendSpy.mock.calls[0];
     expect(fieldName).toBe('file');
-    expect(value).toMatchObject({ uri: NORMALIZED.uri, name: 'photo.jpg', type: 'image/jpeg' });
+    expect(value).toBeInstanceOf(File);
+    expect(value).toHaveProperty('uri', NORMALIZED.uri);
+  });
+
+  /**
+   * Regression guard for the real-device photo-upload failure: React
+   * Native's proprietary `{ uri, name, type }` file descriptor is not
+   * something `expo/fetch` (the global `fetch` since Expo SDK 54) can
+   * encode, so appending one made every upload fail before it left the
+   * device — surfacing only as "Unable to connect to the server."
+   */
+  it('never appends a plain RN { uri, name, type } descriptor that expo/fetch cannot encode', async () => {
+    (authorizedMultipartRequest as jest.Mock).mockResolvedValue({ id: 'photo-1' });
+    const appendSpy = jest.spyOn(FormData.prototype, 'append');
+
+    await uploadReturnPhoto('return-1', NORMALIZED);
+
+    const [, value] = appendSpy.mock.calls[0];
+    expect(Object.getPrototypeOf(value)).not.toBe(Object.prototype);
+    expect(typeof (value as unknown as { bytes?: unknown }).bytes).toBe('function');
   });
 
   it('never sends tenantId, driverId, position, or a storage key', async () => {
