@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { authorizedMultipartRequest, authorizedRequestJson } from '../api/apiClient';
@@ -33,14 +34,25 @@ const PHOTO_FILENAME = 'photo.jpg';
  * {@link NormalizedPhoto}.
  *
  * <p>The `file` part is built differently per platform because a single
- * representation does not work on both: React Native's native `fetch`/
- * `FormData` implementation special-cases a plain `{ uri, name, type }`
- * object appended as a file part and streams the file directly, but on
- * Expo Web `fetch`/`FormData` are the browser's own APIs, which require an
- * actual `Blob`/`File` — appending a plain object there gets silently
- * coerced to a string (effectively `"[object Object]"`), producing a
- * malformed multipart request the backend correctly rejects as missing the
- * required file part. See {@link readUriAsTypedBlob} for the web-only path.
+ * representation does not work on both. On web, `FormData` is the browser's
+ * own API and needs a real `Blob`/`File` (see {@link readUriAsTypedBlob}).
+ *
+ * <p>On native the part must be something the *active* `fetch` can actually
+ * read the bytes of. It deliberately is NOT React Native's proprietary
+ * `{ uri, name, type }` file descriptor: since Expo SDK 54 the Expo runtime
+ * replaces the global `fetch` with `expo/fetch`, whose multipart encoder
+ * only understands a string, a `Blob`, or an object exposing `bytes()` —
+ * an RN file descriptor makes it throw `Unsupported FormDataPart
+ * implementation` *before any request is sent*, which the API client can
+ * only report as a connection failure. `expo-file-system`'s `File`
+ * implements the `Blob` interface over a local URI, so the encoder reads
+ * the file itself and the request is a normal, well-formed multipart POST.
+ * Do not reintroduce the `{ uri, name, type }` form here.
+ *
+ * <p>No explicit filename is passed on native: the part's `filename` comes
+ * from `File.name`, which is the image manipulator's own generated
+ * `<random>.jpg` cache name. It carries no user data, and the backend
+ * ignores it anyway — storage keys are always server-generated.
  */
 export async function uploadReturnPhoto(returnId: string, photo: NormalizedPhoto): Promise<ReturnPhoto> {
   const formData = new FormData();
@@ -48,11 +60,7 @@ export async function uploadReturnPhoto(returnId: string, photo: NormalizedPhoto
     const blob = await readUriAsTypedBlob(photo.uri, photo.contentType);
     formData.append('file', blob, PHOTO_FILENAME);
   } else {
-    formData.append('file', {
-      uri: photo.uri,
-      name: PHOTO_FILENAME,
-      type: photo.contentType,
-    } as unknown as Blob);
+    formData.append('file', new File(photo.uri) as unknown as Blob);
   }
   return authorizedMultipartRequest<ReturnPhoto>(`/api/v1/driver/returns/${encodeURIComponent(returnId)}/photos`, formData);
 }

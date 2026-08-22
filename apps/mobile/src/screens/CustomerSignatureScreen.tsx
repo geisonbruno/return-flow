@@ -27,6 +27,15 @@ export default function CustomerSignatureScreen({ navigation, route }: Props) {
   const [signatureError, setSignatureError] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /**
+   * True only while a finger/pointer is actively drawing inside the pad.
+   * Everything on this screen still scrolls normally before and after a
+   * stroke — smaller devices need that — but a drag inside the pad must draw
+   * rather than move the page under the customer's hand. `SignaturePad`
+   * reports `false` again on release *and* on gesture termination, so an
+   * interrupted gesture can never leave scrolling permanently disabled.
+   */
+  const [drawing, setDrawing] = useState(false);
   const padRef = useRef<SignaturePadHandle>(null);
 
   const load = useCallback(async () => {
@@ -121,7 +130,12 @@ export default function CustomerSignatureScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={!drawing}
+        testID="signature-scroll"
+      >
         <Text style={styles.subtitle}>Ask the customer to review and sign below to complete this return.</Text>
 
         <View style={styles.summaryCard}>
@@ -155,6 +169,7 @@ export default function CustomerSignatureScreen({ navigation, route }: Props) {
           <SignaturePad
             ref={padRef}
             testID="signature-pad"
+            onDrawingActiveChange={setDrawing}
             onStrokesChange={(next) => {
               setStrokes(next);
               if (signatureError) {

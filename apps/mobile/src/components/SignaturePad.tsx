@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -12,6 +12,14 @@ export interface SignaturePadHandle {
 
 interface Props {
   onStrokesChange: (strokes: SignatureStroke[]) => void;
+  /**
+   * Reports whether a finger/pointer is currently drawing inside the pad, so
+   * a scrollable parent can suspend its own scrolling for exactly the
+   * duration of a drawing gesture. Always reports `false` again on both
+   * release and termination, so an interrupted gesture can never leave a
+   * parent permanently locked.
+   */
+  onDrawingActiveChange?: (active: boolean) => void;
   testID?: string;
 }
 
@@ -51,14 +59,45 @@ function strokeToPath(stroke: SignatureStroke, width: number, height: number): s
  * change through {@link Props.onStrokesChange}. `Clear` and `Undo` are
  * exposed imperatively via `ref` because they're triggered by buttons
  * outside the pad's own touch area, not by props.
+ *
+ * <p>{@link Props.onStrokesChange} is invoked from an effect that runs
+ * *after* a committed-strokes change has rendered — never from inside a
+ * `setState` updater. React may run an updater during a render pass, so
+ * calling a parent's setter from one updates the parent while this
+ * component is rendering, which React reports as "Cannot update a component
+ * while rendering a different component". Every updater here is therefore
+ * pure, and the in-progress stroke is authoritative in a ref so committing
+ * it on release needs no nested updater at all.
  */
-const SignaturePad = forwardRef<SignaturePadHandle, Props>(function SignaturePad({ onStrokesChange, testID }, ref) {
+const SignaturePad = forwardRef<SignaturePadHandle, Props>(function SignaturePad(
+  { onStrokesChange, onDrawingActiveChange, testID },
+  ref,
+) {
   const [strokes, setStrokes] = useState<SignatureStroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<SignatureStroke>([]);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const layoutRef = useRef({ width: 0, height: 0 });
+  /**
+   * The in-progress stroke's authoritative value. State mirrors it only so
+   * the stroke renders while it is being drawn; keeping the truth in a ref
+   * is what lets release commit it with one pure `setStrokes` updater
+   * instead of reading it back out of a nested `setCurrentStroke` updater.
+   */
+  const currentStrokeRef = useRef<SignatureStroke>([]);
   const onStrokesChangeRef = useRef(onStrokesChange);
   onStrokesChangeRef.current = onStrokesChange;
+  const onDrawingActiveChangeRef = useRef(onDrawingActiveChange);
+  onDrawingActiveChangeRef.current = onDrawingActiveChange;
+  /** The strokes value already reported to the parent — starts as the initial state, so mounting reports nothing. */
+  const reportedStrokesRef = useRef(strokes);
+
+  useEffect(() => {
+    if (reportedStrokesRef.current === strokes) {
+      return;
+    }
+    reportedStrokesRef.current = strokes;
+    onStrokesChangeRef.current(strokes);
+  }, [strokes]);
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -75,46 +114,53 @@ const SignaturePad = forwardRef<SignaturePadHandle, Props>(function SignaturePad
   }, []);
 
   // Created once via useRef, not recreated on every render — every callback
-  // below reads only refs or uses functional setState updates, so none of
-  // them ever closes over a stale `strokes`/`currentStroke` value.
+  // below reads only refs or uses pure functional setState updates, so none
+  // of them ever closes over a stale `strokes`/`currentStroke` value.
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // A scrolling ancestor asks the current responder to hand the gesture
+      // over as soon as its own native scroll starts; granting that (the
+      // default) is what let the page move under a finger that was drawing.
+      // The pad keeps the gesture until the finger is genuinely released or
+      // the system terminates it.
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (event) => {
         const point = toPoint(event.nativeEvent.locationX, event.nativeEvent.locationY);
-        setCurrentStroke(point ? [point] : []);
+        currentStrokeRef.current = point ? [point] : [];
+        setCurrentStroke(currentStrokeRef.current);
+        onDrawingActiveChangeRef.current?.(true);
       },
       onPanResponderMove: (event) => {
         const point = toPoint(event.nativeEvent.locationX, event.nativeEvent.locationY);
         if (!point) {
           return;
         }
-        setCurrentStroke((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && distance(last, point) < MIN_POINT_DISTANCE) {
-            return prev;
-          }
-          return [...prev, point];
-        });
+        const previous = currentStrokeRef.current;
+        const last = previous[previous.length - 1];
+        if (last && distance(last, point) < MIN_POINT_DISTANCE) {
+          return;
+        }
+        currentStrokeRef.current = [...previous, point];
+        setCurrentStroke(currentStrokeRef.current);
       },
       onPanResponderRelease: () => {
-        setCurrentStroke((prev) => {
-          // A stroke with fewer than two points (a tap) is discarded rather
-          // than committed — the backend would reject it anyway, and there's
-          // no reason to let the driver "undo" a mark they never actually drew.
-          if (prev.length >= 2) {
-            setStrokes((prevStrokes) => {
-              const next = [...prevStrokes, prev];
-              onStrokesChangeRef.current(next);
-              return next;
-            });
-          }
-          return [];
-        });
+        const drawn = currentStrokeRef.current;
+        currentStrokeRef.current = [];
+        setCurrentStroke([]);
+        // A stroke with fewer than two points (a tap) is discarded rather
+        // than committed — the backend would reject it anyway, and there's
+        // no reason to let the driver "undo" a mark they never actually drew.
+        if (drawn.length >= 2) {
+          setStrokes((previous) => [...previous, drawn]);
+        }
+        onDrawingActiveChangeRef.current?.(false);
       },
       onPanResponderTerminate: () => {
+        currentStrokeRef.current = [];
         setCurrentStroke([]);
+        onDrawingActiveChangeRef.current?.(false);
       },
     }),
   ).current;
@@ -123,16 +169,12 @@ const SignaturePad = forwardRef<SignaturePadHandle, Props>(function SignaturePad
     ref,
     () => ({
       clear: () => {
-        setStrokes([]);
+        currentStrokeRef.current = [];
         setCurrentStroke([]);
-        onStrokesChangeRef.current([]);
+        setStrokes([]);
       },
       undoLast: () => {
-        setStrokes((prev) => {
-          const next = prev.slice(0, -1);
-          onStrokesChangeRef.current(next);
-          return next;
-        });
+        setStrokes((previous) => previous.slice(0, -1));
       },
     }),
     [],
