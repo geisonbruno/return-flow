@@ -35,16 +35,17 @@ export class ApiError extends Error {
   readonly status?: number;
   readonly problem?: ProblemDetail;
 
-  private constructor(kind: 'network' | 'http', message: string, status?: number, problem?: ProblemDetail) {
-    super(message);
+  private constructor(kind: 'network' | 'http', message: string, status?: number, problem?: ProblemDetail, cause?: unknown) {
+    super(message, cause === undefined ? undefined : { cause });
     this.name = 'ApiError';
     this.kind = kind;
     this.status = status;
     this.problem = problem;
   }
 
-  static network(): ApiError {
-    return new ApiError('network', 'Unable to connect to the server.', undefined, undefined);
+  /** `cause` is the raw failure `fetch` rejected with — never surfaced to the driver, only kept for diagnosis. */
+  static network(cause?: unknown): ApiError {
+    return new ApiError('network', 'Unable to connect to the server.', undefined, undefined, cause);
   }
 
   static async fromResponse(response: Response): Promise<ApiError> {

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import React, { createRef } from 'react';
+import React, { createRef, useState } from 'react';
 
 import type { SignatureStroke } from '../returns/types';
 import SignaturePad from './SignaturePad';
@@ -155,5 +155,86 @@ describe('SignaturePad', () => {
 
     const afterUndo = onStrokesChange.mock.calls[onStrokesChange.mock.calls.length - 1][0];
     expect(afterUndo).toHaveLength(1);
+  });
+
+  it('reports drawing as active on grant and inactive again on release', () => {
+    const onDrawingActiveChange = jest.fn();
+    render(<SignaturePad testID="pad" onStrokesChange={jest.fn()} onDrawingActiveChange={onDrawingActiveChange} />);
+    const pad = screen.getByTestId('pad');
+
+    fireEvent(pad, 'layout', layout());
+    fireEvent(pad, 'responderGrant', touch(10, 10));
+    expect(onDrawingActiveChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent(pad, 'responderMove', touch(50, 50));
+    fireEvent(pad, 'responderRelease', {});
+    expect(onDrawingActiveChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('reports drawing as inactive when a gesture is terminated instead of released', () => {
+    const onDrawingActiveChange = jest.fn();
+    render(<SignaturePad testID="pad" onStrokesChange={jest.fn()} onDrawingActiveChange={onDrawingActiveChange} />);
+    const pad = screen.getByTestId('pad');
+
+    fireEvent(pad, 'layout', layout());
+    fireEvent(pad, 'responderGrant', touch(10, 10));
+    fireEvent(pad, 'responderMove', touch(50, 50));
+    fireEvent(pad, 'responderTerminate', {});
+
+    expect(onDrawingActiveChange).toHaveBeenLastCalledWith(false);
+  });
+});
+
+/**
+ * Regression guard for the real-device defect: `onStrokesChange` used to be
+ * called from inside `setStrokes`/`setCurrentStroke` updater functions, so
+ * committing a stroke updated the *parent* while this component was
+ * rendering — React reported "Cannot update a component (`X`) while
+ * rendering a different component (`ForwardRef(SignaturePad)`)". The parent
+ * here is deliberately real (it holds the strokes in its own state, exactly
+ * as `CustomerSignatureScreen` does) rather than a `jest.fn()`, because a
+ * mock callback that never calls `setState` cannot reproduce the warning.
+ */
+describe('SignaturePad — parent state updates', () => {
+  function ParentHoldingStrokes({ padRef }: { padRef: React.Ref<SignaturePadHandle> }) {
+    const [strokes, setStrokes] = useState<SignatureStroke[]>([]);
+    return (
+      <>
+        <SignaturePad ref={padRef} testID="pad" onStrokesChange={setStrokes} />
+        {strokes.map((stroke, index) => (
+          <React.Fragment key={index}>{null}</React.Fragment>
+        ))}
+      </>
+    );
+  }
+
+  it('never updates its parent from inside its own state updater', () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const ref = createRef<SignaturePadHandle>();
+      render(<ParentHoldingStrokes padRef={ref} />);
+      const pad = screen.getByTestId('pad');
+
+      fireEvent(pad, 'layout', layout());
+      fireEvent(pad, 'responderGrant', touch(10, 10));
+      fireEvent(pad, 'responderMove', touch(50, 50));
+      fireEvent(pad, 'responderRelease', {});
+
+      fireEvent(pad, 'responderGrant', touch(60, 60));
+      fireEvent(pad, 'responderMove', touch(90, 90));
+      fireEvent(pad, 'responderRelease', {});
+
+      act(() => {
+        ref.current?.undoLast();
+      });
+      act(() => {
+        ref.current?.clear();
+      });
+
+      const messages = consoleError.mock.calls.map((call) => String(call[0]));
+      expect(messages.filter((message) => message.includes('while rendering a different component'))).toEqual([]);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

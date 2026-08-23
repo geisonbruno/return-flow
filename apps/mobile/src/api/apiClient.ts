@@ -13,6 +13,10 @@ interface RequestOptions {
    * Manually setting `Content-Type: multipart/form-data` without the
    * boundary the platform actually used would make the server unable to
    * parse the request at all.
+   *
+   * <p>Each part still has to be something the active `fetch` can encode;
+   * on native that is decided in `returns/returnService.uploadReturnPhoto`,
+   * not here.
    */
   multipart?: boolean;
 }
@@ -66,8 +70,12 @@ async function rawRequest<T>(path: string, options: RequestOptions, accessToken?
           ? JSON.stringify(options.body)
           : undefined,
     });
-  } catch {
-    throw ApiError.network();
+  } catch (error) {
+    // Anything `fetch` itself rejects with — no route to the host, TLS,
+    // DNS, a timeout, or a body it cannot encode — becomes one safe
+    // driver-facing message. The original is kept as `cause` so a failure
+    // here is still diagnosable instead of anonymous.
+    throw ApiError.network(error);
   }
 
   if (!response.ok) {
@@ -145,8 +153,9 @@ export function authorizedRequestJson<T>(path: string, options: RequestOptions =
 /**
  * Authenticated multipart upload — shares the exact same de-duplicated
  * refresh-and-retry-once behavior as {@link authorizedRequestJson} (see
- * {@link authorizedRequest}), just with a `FormData` body and no
- * `Content-Type` header forced onto the request (see {@link RequestOptions.multipart}).
+ * {@link authorizedRequest}), just with an already-built `FormData` body and
+ * no `Content-Type` header forced onto the request (see
+ * {@link RequestOptions.multipart}).
  */
 export function authorizedMultipartRequest<T>(path: string, formData: FormData): Promise<T> {
   return authorizedRequest<T>(path, { method: 'POST', body: formData, multipart: true });
