@@ -104,6 +104,20 @@ Phase 6 is **read-only operational visibility only** — no review action starts
 - Every ADMIN in the initial Warehouse tenant sees identical counts regardless of where they're browsing from.
 - Tenant-specific timezone configuration is deferred until multi-tenant rollout actually needs it — the exact configuration-property name is an implementation detail for Phase 6, not a UX question.
 
+### Approved decisions: dashboard analytics
+
+The dashboard also carries three analytics visualizations — **Returns Over Time**, **Reasons Distribution**, and **Top Routes by Returns**. Their durable, approved behavior:
+
+- **The four summary cards stay independent of the analytics date range.** Waiting Warehouse, In Review, Closed Today, and Returns Today describe current/today operational state and are never reinterpreted through the selected range. **Recent/Latest Returns is likewise independent** and keeps its own most-recent-first query.
+- **One shared date range controls all three charts.** There is a single range selector on the dashboard, not one per chart, and all three always describe the same period.
+- **The analytics population is "returns created in the selected range"** — every tenant-scoped return whose creation date falls inside the selected operational calendar dates, *regardless of its current lifecycle status*. A return that is now `CLOSED`, `IN_REVIEW`, `AWAITING_WAREHOUSE`, or `CANCELLED` counts the same. This is deliberate: the charts describe return *activity created* during the period rather than mixing creation and closing dates in one picture.
+- **Range dates are operational calendar dates** in the same Australia/Sydney business day defined above — both bounds inclusive, never browser-local.
+- **Returns Over Time has a continuous timeline**: every calendar date in the range is present, including days with zero returns, so the chart never has to infer a gap.
+- **Reasons Distribution shows only reasons that actually occurred** in the range; a reason with no returns is absent rather than a zero slice.
+- **Top Routes shows the five busiest routes** by return count, and a route that has since been deactivated still appears for its historical returns.
+- **Percentages, totals, labels, colors, and every other display concern belong to the frontend.** The API returns reason enum values and raw counts only; the Web already owns user-facing reason labels and can sum the counts itself for a donut total or percentage.
+- Any preset such as "Last 7 days" is a **frontend default**. The backend understands explicit calendar-date boundaries only and invents no preset of its own.
+
 ## 6. Returns list — Phase 6
 
 - **Pagination:** server-side, page-based (matches `docs/IMPLEMENTATION_PLAN.md` §15's "server-paginated returns list").
