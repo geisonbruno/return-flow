@@ -41,6 +41,17 @@ class OperationalDayService {
 		this.clock = clock;
 	}
 
+	/**
+	 * The configured business timezone itself. Needed by
+	 * {@code AdminReturnAnalyticsService}, whose Returns Over Time aggregate
+	 * buckets rows by operational calendar date inside the database and so must
+	 * hand the very same zone to SQL — rather than letting a query pick its own
+	 * notion of a day.
+	 */
+	ZoneId businessZone() {
+		return businessZone;
+	}
+
 	/** Today's date in the configured business timezone — not the JVM's default zone. */
 	LocalDate today() {
 		return LocalDate.now(clock.withZone(businessZone));

@@ -98,6 +98,7 @@ Do not generalize the V1 domain to `Incident`.
 - close/cancel;
 - search and pagination;
 - dashboard summary;
+- dashboard analytics (returns over time, reasons distribution, top routes) over an explicit operational date range;
 - optimistic locking;
 - human-readable return number.
 
