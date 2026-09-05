@@ -54,6 +54,31 @@ export interface AdminDashboardSummary {
   returnsToday: number;
 }
 
+export interface DashboardAnalytics {
+  from: string;
+  to: string;
+  returnsOverTime: DashboardReturnsOverTimePoint[];
+  reasonsDistribution: DashboardReasonDistribution[];
+  topRoutes: DashboardTopRoute[];
+}
+
+export interface DashboardReturnsOverTimePoint {
+  date: string;
+  count: number;
+}
+
+export interface DashboardReasonDistribution {
+  reason: ReturnReason;
+  count: number;
+}
+
+export interface DashboardTopRoute {
+  routeId: string;
+  routeCode: string;
+  routeName: string;
+  count: number;
+}
+
 /**
  * Matches the backend's `returnrecord.dto.AdminReturnListItemResponse` (one
  * row of GET /admin/returns). `reviewer` is `null` until a review has

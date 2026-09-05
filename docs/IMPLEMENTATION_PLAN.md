@@ -559,7 +559,7 @@ Create or update a concise web UX document covering:
 
 ### Boundaries
 
-- no charts;
+- no charts during the original functional UX checkpoint; the later-approved Dashboard redesign adds exactly Returns Over Time, Reasons Distribution, and Top Routes by Returns without creating a new roadmap phase;
 - no full design system;
 - no speculative analytics;
 - no animation work that delays validation;
@@ -582,6 +582,7 @@ Give admins tenant-scoped visibility into return operations.
   - Closed Today;
   - Returns Today;
 - Latest Returns;
+- exactly three later-approved Dashboard visualizations — Returns Over Time, Reasons Distribution, and Top Routes by Returns — sharing one explicit Sydney operational date range, defaulting in the frontend to Last 30 days, preserving all three cards for empty periods, and remaining independent from the four cards and Recent Returns;
 - server-paginated returns list;
 - global search by return number, customer, product, driver, and route;
 - filters for status, reason, date range, driver, and route;
@@ -591,10 +592,12 @@ Give admins tenant-scoped visibility into return operations.
 - polling-based refresh and in-app feedback where useful;
 - web tests for authentication, filters, lists, and states.
 
+The later-approved visual redesign completes the desktop Dashboard and authenticated shell only. Tablet and phone adaptation remains future work, and the remaining authenticated pages stay functional without joining this visual redesign. Recharts is the sole chart dependency added for the three approved visualizations.
+
 ### Excluded
 
 - warehouse editing and close actions;
-- charts;
+- analytics beyond the three later-approved Dashboard visualizations;
 - real-time WebSockets;
 - push notifications;
 - user and route management UI;

@@ -209,6 +209,9 @@ describe('App routing', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument());
 
     await act(async () => {
+      screen.getByText('Ada Admin', { selector: '.account-menu summary span' }).click();
+    });
+    await act(async () => {
       screen.getByRole('button', { name: 'Log out' }).click();
     });
 

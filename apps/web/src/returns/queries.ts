@@ -4,6 +4,7 @@ import {
   cancelReturn,
   closeReturn,
   fetchDashboardSummary,
+  fetchDashboardAnalytics,
   fetchMediaBlob,
   fetchReturnDetail,
   fetchReturnPdf,
@@ -31,6 +32,18 @@ export function useDashboardSummary() {
     // Only polls while the tab is actually visible/focused — no background
     // polling from an inactive tab.
     refetchIntervalInBackground: false,
+  });
+}
+
+export function dashboardAnalyticsQueryKey(from: string, to: string) {
+  return ['admin', 'dashboard', 'analytics', from, to] as const;
+}
+
+export function useDashboardAnalytics(from: string | null, to: string | null) {
+  return useQuery({
+    queryKey: dashboardAnalyticsQueryKey(from ?? '', to ?? ''),
+    queryFn: () => fetchDashboardAnalytics(from as string, to as string),
+    enabled: Boolean(from && to),
   });
 }
 

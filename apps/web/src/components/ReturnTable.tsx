@@ -54,7 +54,7 @@ export function ReturnTable({ returns, compact = false, backTo }: ReturnTablePro
               <td>{item.driver.fullName}</td>
               <td>{item.route.code}</td>
               <td>
-                <StatusBadge label={STATUS_LABELS[item.status]} />
+                <StatusBadge status={item.status} label={STATUS_LABELS[item.status]} />
               </td>
               <td>{item.reviewer?.fullName ?? '—'}</td>
             </tr>
