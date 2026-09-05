@@ -553,7 +553,9 @@ Required areas:
 
 ### 17.1 Operational Summary
 
-No charts in V1.
+The Dashboard includes exactly three approved analytics visualizations — Returns Over Time, Reasons Distribution, and Top Routes by Returns — sharing one explicit Sydney operational date range. The frontend defaults the shared selector to Last 30 days and also offers Last 7 days, This month, and Custom range. Successful empty periods preserve all three visualization cards. The four operational cards and independent latest-five Recent Returns table remain outside that range. Recharts is the sole chart dependency. No additional analytics, trends, financial values, or driver scoring are approved.
+
+The developer-approved Dashboard redesign is desktop-only: a persistent/collapsible authenticated sidebar and compact main header frame the redesigned Dashboard, while tablet/phone adaptation remains future work. Other authenticated pages remain functional but are not visually redesigned by this task.
 
 Use four concise clickable cards:
 

@@ -2,6 +2,7 @@ import { authorizedRequestBlob, authorizedRequestJson } from '../api/apiClient';
 import { toApiRelativePath } from '../config/environment';
 import type {
   AdminDashboardSummary,
+  DashboardAnalytics,
   AdminReturnDetail,
   AdminReturnListItem,
   AdminRouteSummary,
@@ -12,6 +13,11 @@ import type {
 
 export function fetchDashboardSummary(): Promise<AdminDashboardSummary> {
   return authorizedRequestJson<AdminDashboardSummary>('/admin/dashboard/summary');
+}
+
+export function fetchDashboardAnalytics(from: string, to: string): Promise<DashboardAnalytics> {
+  const query = new URLSearchParams({ from, to });
+  return authorizedRequestJson<DashboardAnalytics>(`/admin/dashboard/analytics?${query.toString()}`);
 }
 
 /** Every filter is optional and omitted from the query string entirely when absent — never sent as an empty string. */

@@ -26,7 +26,7 @@ Add routes only when they simplify a real flow.
 ## UX principles
 
 - operational clarity over visual complexity;
-- no dashboard charts in V1;
+- exactly three approved Dashboard analytics visualizations, all sharing one date range;
 - explicit status labels;
 - explicit `Start Review` action;
 - opening details never changes status;
@@ -35,7 +35,7 @@ Add routes only when they simplify a real flow.
 - understandable errors;
 - form values preserved after recoverable failures;
 - loading, empty, and error states;
-- desktop-first and reasonably responsive;
+- desktop-first; the approved Dashboard redesign is desktop-only, with tablet/phone adaptation deferred;
 - keyboard accessibility and visible focus.
 
 ## Dashboard
@@ -47,9 +47,15 @@ Show four clickable cards:
 - Closed Today
 - Returns Today
 
-Show Latest Returns below.
+Show the independent latest-five Recent Returns table below the analytics cards, with a View all returns link and no Dashboard pagination.
 
-Do not add charts, trends, financial values, or driver scoring. Simple polling is acceptable; WebSockets and browser push are not.
+Show exactly three analytics visualizations below the operational cards: Returns Over Time, Reasons Distribution, and Top Routes by Returns. They share one explicit Sydney operational date range and use the ADMIN Dashboard analytics endpoint. The four cards and Latest/Recent Returns remain independent of that range.
+
+Use one shared period selector for all three visualizations. The frontend default is Last 30 days; Last 7 days, This month, and a compact inline Custom range remain available. A successful empty period keeps all three chart cards rendered: Returns Over Time remains continuous and zero-filled, while Reasons Distribution and Top Routes show honest in-card empty states. Analytics do not poll; manual Refresh refetches summary, Recent Returns, and analytics. Recharts is the sole approved chart dependency.
+
+The approved desktop shell has a persistent 240px sidebar, a centered 76px collapsed rail, the hamburger in the main header, and Refresh/account controls aligned to the Dashboard content grid. Preserve that composition. Other authenticated pages must remain functional but are not part of this visual redesign.
+
+Do not add other charts, trends, financial values, or driver scoring. Simple polling is acceptable for operational data; analytics do not poll. WebSockets and browser push are not.
 
 ## Returns list
 
@@ -170,7 +176,7 @@ Avoid snapshot-heavy tests.
 
 ## Do not
 
-Do not add charts, push, WebSockets, finance/product modules, automatic review on load, shared UI components with React Native, a giant design system, Redux without evidence, client-invented statuses, or browser-generated authoritative PDFs.
+Do not add analytics beyond the three approved Dashboard visualizations, push, WebSockets, finance/product modules, automatic review on load, shared UI components with React Native, a giant design system, Redux without evidence, client-invented statuses, or browser-generated authoritative PDFs.
 
 ## First web milestone
 

@@ -26,6 +26,16 @@ export function todaySydneyDate(): string {
   return sydneyDateFormatter.format(new Date());
 }
 
+export function shiftIsoDate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
+export function firstDayOfIsoMonth(isoDate: string): string {
+  return `${isoDate.slice(0, 7)}-01`;
+}
+
 const sydneyTimestampFormatter = new Intl.DateTimeFormat('en-AU', {
   timeZone: OPERATIONAL_TIME_ZONE,
   day: 'numeric',

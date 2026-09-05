@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,10 +57,12 @@ const LATEST_RETURNS_PAGE = {
 };
 
 const EMPTY_PAGE = { content: [], page: 0, size: 5, totalElements: 0, totalPages: 0 };
+const ANALYTICS = { from: '2026-08-03', to: '2026-09-01', returnsOverTime: [{ date: '2026-09-01', count: 1 }], reasonsDistribution: [{ reason: 'DAMAGED', count: 1 }], topRoutes: [{ routeId: 'rt1', routeCode: 'R1', routeName: 'Route 1', count: 1 }] };
 
 interface FetchOverrides {
   summary?: Response | (() => Promise<Response>);
   latest?: Response | (() => Promise<Response>);
+  analytics?: Response | (() => Promise<Response>);
 }
 
 function stubFetch(overrides: FetchOverrides = {}) {
@@ -70,6 +72,9 @@ function stubFetch(overrides: FetchOverrides = {}) {
       const url = typeof input === 'string' ? input : (input as Request).url;
       if (url.includes('/admin/dashboard/summary')) {
         return overrides.summary instanceof Function ? overrides.summary() : (overrides.summary ?? jsonResponse(200, SUMMARY));
+      }
+      if (url.includes('/admin/dashboard/analytics')) {
+        return overrides.analytics instanceof Function ? overrides.analytics() : (overrides.analytics ?? jsonResponse(200, ANALYTICS));
       }
       if (url.includes('/admin/returns')) {
         return overrides.latest instanceof Function ? overrides.latest() : (overrides.latest ?? jsonResponse(200, LATEST_RETURNS_PAGE));
@@ -189,7 +194,7 @@ describe('DashboardPage', () => {
     stubFetch({ summary: jsonResponse(500, {}) });
     renderDashboard();
 
-    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Unable to load the dashboard summary.')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText('RF-000001')).toBeInTheDocument());
   });
 
@@ -234,5 +239,67 @@ describe('DashboardPage', () => {
     });
 
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(callsBefore));
+  });
+
+  it('requests the default Last 30 days as explicit Sydney dates', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T23:30:00Z'));
+    stubFetch();
+    renderDashboard();
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('from=2025-12-04&to=2026-01-02'))).toBe(true));
+  });
+
+  it('suppresses incomplete and reversed custom ranges, then requests a valid range', async () => {
+    stubFetch();
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('RF-000001')).toBeInTheDocument());
+    const analyticsCallsBefore = vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes('/analytics')).length;
+    fireEvent.change(screen.getByLabelText('Period'), { target: { value: 'CUSTOM' } });
+    expect(screen.getByText('Choose both From and To dates.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-08-10' } });
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-08-01' } });
+    expect(screen.getByText('From date must be on or before To date.')).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).includes('/analytics')).length).toBe(analyticsCallsBefore);
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-08-12' } });
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes('from=2026-08-10&to=2026-08-12'))).toBe(true));
+  });
+
+  it('uses the approved Recent Returns columns without Reviewer or pagination', async () => {
+    stubFetch();
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('RF-000001')).toBeInTheDocument());
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Return #', 'Created', 'Customer', 'Product', 'Reason', 'Driver', 'Route', 'Status']);
+    expect(screen.queryByText('Reviewer')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /pagination/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View all returns' })).toHaveAttribute('href', '/returns');
+  });
+
+  it('analytics failure does not hide operational cards or Recent Returns', async () => {
+    stubFetch({ analytics: jsonResponse(500, {}) });
+    renderDashboard();
+    await waitFor(() => expect(screen.getByText('Unable to load return analytics.')).toBeInTheDocument());
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('RF-000001')).toBeInTheDocument();
+  });
+
+  it('keeps all three chart panels visible for a successful empty analytics response', async () => {
+    stubFetch({
+      analytics: jsonResponse(200, {
+        from: '2026-08-03',
+        to: '2026-08-04',
+        returnsOverTime: [{ date: '2026-08-03', count: 0 }, { date: '2026-08-04', count: 0 }],
+        reasonsDistribution: [],
+        topRoutes: [],
+      }),
+    });
+    renderDashboard();
+
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Returns Over Time' })).toBeInTheDocument());
+    expect(screen.getByRole('region', { name: 'Reasons Distribution' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Top Routes by Returns' })).toBeInTheDocument();
+    expect(screen.getByText(/2026-08-03: 0 returns/)).toBeInTheDocument();
+    expect(screen.getByText('No reasons in this period.')).toBeInTheDocument();
+    expect(screen.getByText('No route returns in this period.')).toBeInTheDocument();
+    expect(screen.queryByText('No returns were created in this period.')).not.toBeInTheDocument();
   });
 });

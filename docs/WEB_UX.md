@@ -79,6 +79,8 @@ The web client reuses the existing `/api/v1/auth/{login,refresh,logout}` and `GE
 
 ## 5. Operational dashboard — Phase 6
 
+The approved desktop presentation uses a persistent authenticated sidebar and a compact main header. The Dashboard heading and the Refresh/account controls share the same horizontal content boundaries as the cards, analytics, and Recent Returns below. The sidebar collapses to a centered 76px rail while the main content expands; its hamburger remains in the main header.
+
 Four summary cards, read-only:
 
 | Card | Counts | Click behavior |
@@ -90,7 +92,7 @@ Four summary cards, read-only:
 
 Each card: a loading skeleton while the count loads, a plain `0` (not a hidden/blank card) when the count is genuinely zero, and a compact inline error with retry if the summary request fails — the rest of the dashboard still renders.
 
-**Latest Returns** (below the cards): a compact list/table of the most recent returns tenant-wide — return number, customer, product, driver, route, reason, status, created time — each row linking to Return Details. Same loading/empty/error handling as the cards. It shows absolute timestamps (most recent first), not a "today" bucket, so the operational-day rule below only matters where it's explicitly used — the cards and date-range filters.
+**Recent Returns** (below the analytics cards): an independent compact table of the latest five returns tenant-wide — return number, created time, customer, product, reason, driver, route, and status — with each return number linking to Return Details and one View all returns link to the full Returns list. There is no Dashboard pagination. It has independent loading/empty/error handling and 30-second foreground polling. It shows absolute timestamps (most recent first), not a "today" bucket, so the operational-day rule below only matters where explicitly used — the cards, analytics selector, and date-range filters.
 
 Phase 6 is **read-only operational visibility only** — no review action starts from the dashboard.
 
@@ -116,7 +118,9 @@ The dashboard also carries three analytics visualizations — **Returns Over Tim
 - **Reasons Distribution shows only reasons that actually occurred** in the range; a reason with no returns is absent rather than a zero slice.
 - **Top Routes shows the five busiest routes** by return count, and a route that has since been deactivated still appears for its historical returns.
 - **Percentages, totals, labels, colors, and every other display concern belong to the frontend.** The API returns reason enum values and raw counts only; the Web already owns user-facing reason labels and can sum the counts itself for a donut total or percentage.
-- Any preset such as "Last 7 days" is a **frontend default**. The backend understands explicit calendar-date boundaries only and invents no preset of its own.
+- The frontend defaults the shared selector to **Last 30 days** and also offers Last 7 days, This month, and an inline Custom range. The backend understands explicit calendar-date boundaries only and invents no preset of its own.
+- A successful empty period never removes the analytics row: Returns Over Time keeps the continuous zero-filled series, Reasons Distribution shows an honest zero-data state inside its card, and Top Routes shows an honest in-card empty state.
+- Recharts is the sole chart dependency. Analytics do not poll; manual Refresh refetches summary, Recent Returns, and analytics together.
 
 ## 6. Returns list — Phase 6
 
@@ -237,9 +241,9 @@ No stack trace, filesystem path, storage key, token, database detail, or interna
 
 ## 11. Responsive behavior
 
-- **Desktop** (primary target): persistent sidebar/nav, full table with every column from §6, side-by-side layout on Return Details where it helps scanning (e.g. driver info beside photos).
-- **Tablet:** nav collapses to an accessible toggle if needed; table drops lower-priority columns (e.g. route, reviewer) behind a "more" affordance or row expansion; filters move into a compact panel; all review actions remain reachable.
-- **Small browser viewport (phone-width browser):** table becomes a card-per-row list; every critical action (Start Review, Close, Cancel) stays reachable, just stacked vertically; this is for occasional access, not the primary warehouse workflow — root `CLAUDE.md` explicitly targets a driver mobile app for the phone form factor, not this web app.
+- **Desktop** (approved and implemented): persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows.
+- **Tablet:** adaptation remains future work; no tablet layout is approved by the Dashboard redesign.
+- **Small browser viewport (phone-width browser):** adaptation remains future work; the driver-facing mobile app remains the approved phone workflow.
 
 No separate mobile web product is designed.
 
@@ -270,12 +274,12 @@ This checkpoint implements none of the above.
 
 ### Dashboard
 
-- **Header:** shell nav (Dashboard active), tenant name, logout
-- **Primary content:** four summary cards, then Latest Returns list
+- **Header:** persistent shell nav (Dashboard active), hamburger and Dashboard heading on the left, Refresh and the account control on the right
+- **Primary content:** four operational cards, one shared analytics period selector, three analytics cards, then the latest-five Recent Returns table
 - **Primary action:** click a card → filtered Returns list
-- **Secondary actions:** click a Latest Returns row → Return Details
+- **Secondary actions:** select one shared analytics period; click a Recent Returns number → Return Details; View all returns → Returns
 - **Loading:** skeleton cards + skeleton list
-- **Empty:** cards show `0`; Latest Returns shows "No returns yet."
+- **Empty:** operational cards show `0`; all three analytics cards remain present with honest in-card empty states; Recent Returns shows "No returns yet."
 - **Failure:** inline error + retry per section, independent of each other
 
 ### Returns
