@@ -237,7 +237,7 @@ describe('App routing', () => {
     window.history.pushState({}, '', '/returns');
     stubAuthenticatedFetchWithReturn();
     render(<App />);
-    await screen.findByRole('heading', { name: 'Returns', exact: true });
+    await screen.findByRole('heading', { name: /^Returns$/ });
 
     await act(async () => { screen.getByRole('button', { name: 'Collapse sidebar' }).click(); });
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false');
@@ -246,7 +246,7 @@ describe('App routing', () => {
 
     await act(async () => { screen.getByRole('button', { name: 'Expand sidebar' }).click(); });
     expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getAllByRole('heading', { name: 'Returns', exact: true })).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { name: /^Returns$/ })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
     expect(screen.getByRole('main').parentElement).toHaveClass('app-shell__main--compact-header');
   });
