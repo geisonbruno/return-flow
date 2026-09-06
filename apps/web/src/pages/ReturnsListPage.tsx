@@ -4,6 +4,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import { toSafeErrorMessage } from '../api/problemDetail';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorState } from '../components/ErrorState';
+import { Icon } from '../components/Icon';
 import { LoadingState } from '../components/LoadingState';
 import { Pagination } from '../components/Pagination';
 import { ReturnTable } from '../components/ReturnTable';
@@ -18,6 +19,7 @@ import {
 } from '../returns/filters';
 import { useDriverOptions, useReturnsList, useRouteOptions } from '../returns/queries';
 import { REASON_OPTIONS, STATUS_OPTIONS } from '../returns/returnOptions';
+import './ReturnsListPage.css';
 
 export function ReturnsListPage() {
   useEffect(() => {
@@ -91,23 +93,33 @@ export function ReturnsListPage() {
 
   return (
     <section className="returns-page">
-      <div className="page-header">
-        <h1>Returns</h1>
-        <button type="button" onClick={() => returnsQuery.refetch()}>
+      <header className="compact-page-header returns-page__header">
+        <div>
+          <h1>Returns</h1>
+          <p>Manage and track all product returns</p>
+        </div>
+        <button className="returns-page__refresh" type="button" onClick={() => returnsQuery.refetch()}>
+          <Icon name="refresh" />
           Refresh
         </button>
-      </div>
+      </header>
 
       <form className="returns-filters" onSubmit={handleSearchSubmit}>
         <div className="form-field returns-filters__search">
-          <label htmlFor="returns-search">Search</label>
-          <input
-            id="returns-search"
-            type="search"
-            value={searchDraft}
-            onChange={(event) => setSearchDraft(event.target.value)}
-            placeholder="Return #, customer, product, driver, route"
-          />
+          <label className="sr-only" htmlFor="returns-search">Search</label>
+          <div className="returns-filters__search-control">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="7" />
+              <path d="m16 16 5 5" />
+            </svg>
+            <input
+              id="returns-search"
+              type="search"
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
+              placeholder="Return #, customer, product, driver, route"
+            />
+          </div>
         </div>
         <button type="submit">Search</button>
 
@@ -172,14 +184,24 @@ export function ReturnsListPage() {
             value={createdFromDraft}
             onChange={(event) => setCreatedFromDraft(event.target.value)}
             onBlur={commitDateRange}
+            aria-invalid={draftDateRangeInvalid || undefined}
+            aria-describedby={draftDateRangeInvalid ? 'returns-date-error' : undefined}
           />
         </div>
         <div className="form-field">
           <label htmlFor="returns-created-to">Created to</label>
-          <input id="returns-created-to" type="date" value={createdToDraft} onChange={(event) => setCreatedToDraft(event.target.value)} onBlur={commitDateRange} />
+          <input
+            id="returns-created-to"
+            type="date"
+            value={createdToDraft}
+            onChange={(event) => setCreatedToDraft(event.target.value)}
+            onBlur={commitDateRange}
+            aria-invalid={draftDateRangeInvalid || undefined}
+            aria-describedby={draftDateRangeInvalid ? 'returns-date-error' : undefined}
+          />
         </div>
 
-        <button type="button" onClick={handleClearFilters} disabled={!filtersActive && filters.page === 0}>
+        <button className="returns-filters__clear" type="button" onClick={handleClearFilters} disabled={!filtersActive && filters.page === 0}>
           Clear filters
         </button>
       </form>
@@ -193,7 +215,7 @@ export function ReturnsListPage() {
         </div>
       )}
 
-      {draftDateRangeInvalid && <p className="error-message" role="alert">&quot;Created from&quot; must not be after &quot;Created to&quot;.</p>}
+      {draftDateRangeInvalid && <p id="returns-date-error" className="error-message" role="alert">&quot;Created from&quot; must not be after &quot;Created to&quot;.</p>}
 
       {returnsQuery.isPending ? (
         <LoadingState label="Loading returns…" />

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,7 +47,7 @@ function makePage(content: unknown[], overrides: Record<string, unknown> = {}) {
   return { content, page: 0, size: 25, totalElements: content.length, totalPages: content.length > 0 ? 1 : 0, ...overrides };
 }
 
-type ReturnsResponder = (url: URL) => Response;
+type ReturnsResponder = (url: URL) => Response | Promise<Response>;
 
 function defaultReturnsResponder(url: URL): Response {
   const page = Number(url.searchParams.get('page') ?? '0');
@@ -88,6 +88,11 @@ function LocationDisplay() {
   return <div data-testid="url">{`${location.pathname}${location.search}`}</div>;
 }
 
+function DetailDestination() {
+  const location = useLocation();
+  return <div>Back destination: {location.state?.from}</div>;
+}
+
 function renderReturnsPage(initialPath = '/returns') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -96,6 +101,7 @@ function renderReturnsPage(initialPath = '/returns') {
         <LocationDisplay />
         <Routes>
           <Route path="/returns" element={<ReturnsListPage />} />
+          <Route path="/returns/:returnId" element={<DetailDestination />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -130,6 +136,55 @@ describe('ReturnsListPage', () => {
     expect(screen.getByText('Acme Ltd')).toBeInTheDocument();
   });
 
+  it('renders the Returns heading, subtitle, and all ten operational table columns', async () => {
+    stubFetch();
+    renderReturnsPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Returns' })).toBeInTheDocument();
+    expect(screen.getByText('Manage and track all product returns')).toBeInTheDocument();
+    const table = await screen.findByRole('table');
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Return #', 'Created', 'Customer', 'Product', 'Qty / Unit', 'Reason', 'Driver', 'Route', 'Status', 'Reviewer',
+    ]);
+    expect(within(table).getByRole('cell', { name: '2 EA' })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: 'Awaiting warehouse' })).toBeInTheDocument();
+  });
+
+  it('Refresh refetches real list data without clearing the current filters', async () => {
+    const responder = vi.fn<ReturnsResponder>()
+      .mockReturnValueOnce(jsonResponse(200, makePage([makeReturn({ customerName: 'Original customer' })])))
+      .mockReturnValue(jsonResponse(200, makePage([makeReturn({ customerName: 'Updated customer' })])));
+    stubFetch(responder);
+    renderReturnsPage('/returns?status=CLOSED&search=acme');
+    await screen.findByText('Original customer');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    });
+
+    expect(await screen.findByText('Updated customer')).toBeInTheDocument();
+    expect(responder).toHaveBeenCalledTimes(2);
+    expect(lastReturnsRequestUrl().searchParams.get('search')).toBe('acme');
+    expect(lastReturnsRequestUrl().searchParams.get('status')).toBe('CLOSED');
+    expect(screen.getByTestId('url')).toHaveTextContent('/returns?status=CLOSED&search=acme');
+  });
+
+  it('shows honest loading feedback without a table while the list request is pending', async () => {
+    let resolveRequest!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => { resolveRequest = resolve; });
+    stubFetch(() => response);
+    renderReturnsPage();
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading returns…');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveRequest(jsonResponse(200, makePage([makeReturn()])));
+    });
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(screen.queryByText('Loading returns…')).not.toBeInTheDocument();
+  });
+
   it('shows the reviewer name when a return is in review, and a neutral dash otherwise', async () => {
     stubFetch(() =>
       jsonResponse(
@@ -160,9 +215,13 @@ describe('ReturnsListPage', () => {
 
   it('links the Return # to /returns/{id}, preserving the current filtered view as the "back" destination', async () => {
     stubFetch(() => jsonResponse(200, makePage([makeReturn({ id: 'return-row-1', returnNumber: 'RF-000042' })])));
-    renderReturnsPage('/returns?status=AWAITING_WAREHOUSE');
+    const listLocation = '/returns?status=AWAITING_WAREHOUSE&search=acme&page=2';
+    renderReturnsPage(listLocation);
 
-    await waitFor(() => expect(screen.getByRole('link', { name: 'RF-000042' })).toHaveAttribute('href', '/returns/return-row-1'));
+    const link = await screen.findByRole('link', { name: 'RF-000042' });
+    expect(link).toHaveAttribute('href', '/returns/return-row-1');
+    await act(async () => { fireEvent.click(link); });
+    expect(screen.getByText(`Back destination: ${listLocation}`)).toBeInTheDocument();
   });
 
   it('reads pagination fields from the PageResponse envelope', async () => {
@@ -205,6 +264,7 @@ describe('ReturnsListPage', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled());
 
     fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'acme' } });
+    expect(lastReturnsRequestUrl().searchParams.get('search')).toBeNull();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     });
@@ -398,6 +458,7 @@ describe('ReturnsListPage', () => {
     expect(screen.getByTestId('url').textContent).not.toContain('?');
     expect(screen.getByLabelText('Search')).toHaveValue('');
     expect(screen.getByLabelText('Status')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeDisabled();
   });
 
   it('shows the empty-tenant message when there are no returns and no filters are active', async () => {
@@ -444,6 +505,10 @@ describe('ReturnsListPage', () => {
     });
 
     expect(await screen.findByText('"Created from" must not be after "Created to".')).toBeInTheDocument();
+    for (const label of ['Created from', 'Created to']) {
+      expect(screen.getByLabelText(label)).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByLabelText(label)).toHaveAccessibleDescription('"Created from" must not be after "Created to".');
+    }
     expect(vi.mocked(fetch).mock.calls.length).toBe(callsBefore);
   });
 
