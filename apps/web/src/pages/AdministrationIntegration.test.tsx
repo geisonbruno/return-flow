@@ -165,7 +165,7 @@ describe('Administration pages share route state', () => {
       fireEvent.click(within(row).getByRole('button', { name: 'Edit' }));
     });
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Active'));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Active' }));
     });
     await act(async () => {
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save changes' }));
@@ -173,7 +173,7 @@ describe('Administration pages share route state', () => {
     await act(async () => {
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deactivate route' }));
     });
-    await waitFor(() => expect(screen.getByText('Inactive')).toBeInTheDocument());
+    await waitFor(() => expect(within(row).getByText('Inactive')).toBeInTheDocument());
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create user' }));

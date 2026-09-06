@@ -7,8 +7,10 @@ import { useAuth } from '../auth/AuthContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorState } from '../components/ErrorState';
+import { Icon } from '../components/Icon';
 import { LoadingState } from '../components/LoadingState';
 import { StatusBadge } from '../components/StatusBadge';
+import './UsersPage.css';
 
 /**
  * Mirrors the backend's `@Size(min = 8)` on both `CreateUserRequest.password`
@@ -104,6 +106,9 @@ export function UsersPage() {
   const resetPasswordMutation = useResetUserPassword();
 
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<AdminUserRole | ''>('');
+  const [statusFilter, setStatusFilter] = useState<'' | 'active' | 'inactive'>('');
+  const [routeFilter, setRouteFilter] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -127,11 +132,20 @@ export function UsersPage() {
   const visibleUsers = useMemo(() => {
     const users = usersQuery.data ?? [];
     const term = search.trim().toLowerCase();
-    if (!term) {
-      return users;
-    }
-    return users.filter((user) => user.name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term));
-  }, [usersQuery.data, search]);
+    return users.filter((user) =>
+      (!term || user.name.toLowerCase().includes(term) || user.email.toLowerCase().includes(term)) &&
+      (!roleFilter || user.role === roleFilter) &&
+      (!statusFilter || user.active === (statusFilter === 'active')) &&
+      (!routeFilter || user.route?.id === routeFilter),
+    );
+  }, [usersQuery.data, search, roleFilter, statusFilter, routeFilter]);
+
+  // Counts describe the complete loaded population, never the filtered rows.
+  const userCounts = usersQuery.data ? {
+    total: usersQuery.data.length,
+    active: usersQuery.data.filter((user) => user.active === true).length,
+    inactive: usersQuery.data.filter((user) => user.active === false).length,
+  } : null;
 
   /** Every sensitive value this page holds is cleared here — nothing typed into a password field outlives its own dialog. */
   const closeCreateDialog = () => {
@@ -288,13 +302,41 @@ export function UsersPage() {
   const editingSelf = Boolean(editingUser && currentUser && editingUser.id === currentUser.userId);
 
   return (
-    <section className="admin-page">
-      <div className="page-header">
-        <h1>Users</h1>
-        <button type="button" onClick={handleOpenCreate}>
-          Create user
+    <section className="admin-page users-page">
+      <header className="compact-page-header users-page__header">
+        <div>
+          <h1>Users</h1>
+          <p>Manage system users and their access permissions</p>
+        </div>
+        <button className="users-page__create" type="button" onClick={handleOpenCreate}>
+          <span aria-hidden="true">+</span> Create user
         </button>
-      </div>
+      </header>
+
+      {usersQuery.isSuccess && userCounts && (
+        <section className="users-summary" aria-label="User summary">
+          {([
+            { key: 'total', label: 'Total users', count: userCounts.total },
+            { key: 'active', label: 'Active', count: userCounts.active },
+            { key: 'inactive', label: 'Inactive', count: userCounts.inactive },
+          ] as const).map((card) => (
+            <article className={`users-summary__card users-summary__card--${card.key}`} key={card.key} aria-labelledby={`users-summary-${card.key}`}>
+              <span className="users-summary__icon">
+                {card.key === 'total' ? <Icon name="users" /> : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="7" r="4" />
+                    <path d="M4 20a8 8 0 0 1 16 0v1H4z" />
+                  </svg>
+                )}
+              </span>
+              <div>
+                <h2 id={`users-summary-${card.key}`}>{card.label}</h2>
+                <p>{card.count}</p>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
 
       {feedback && (
         <p className="form-success" role="status">
@@ -302,9 +344,13 @@ export function UsersPage() {
         </p>
       )}
 
-      <div className="admin-toolbar">
-        <div className="form-field">
-          <label htmlFor="users-search">Search</label>
+      <div className="users-filters" role="group" aria-label="User filters">
+        <div className="form-field users-filters__search">
+          <label className="sr-only" htmlFor="users-search">Search</label>
+          <svg className="users-filters__search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="7" />
+            <path d="m16 16 5 5" />
+          </svg>
           <input
             id="users-search"
             type="search"
@@ -313,6 +359,29 @@ export function UsersPage() {
             placeholder="Name or email"
           />
         </div>
+        <div className="form-field">
+          <label htmlFor="users-role-filter">Role</label>
+          <select id="users-role-filter" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as AdminUserRole | '')}>
+            <option value="">All roles</option>
+            <option value="ADMIN">Admin</option>
+            <option value="DRIVER">Driver</option>
+          </select>
+        </div>
+        <div className="form-field">
+          <label htmlFor="users-status-filter">Status</label>
+          <select id="users-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as '' | 'active' | 'inactive')}>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div className="form-field">
+          <label htmlFor="users-route-filter">Route</label>
+          <select id="users-route-filter" value={routeFilter} onChange={(event) => setRouteFilter(event.target.value)} disabled={routesQuery.isPending}>
+            <option value="">All routes</option>
+            {routes.map((route) => <option key={route.id} value={route.id}>{routeLabel(route)}</option>)}
+          </select>
+        </div>
       </div>
 
       {usersQuery.isPending ? (
@@ -320,7 +389,7 @@ export function UsersPage() {
       ) : usersQuery.isError ? (
         <ErrorState message={toSafeErrorMessage(usersQuery.error, 'Unable to load users.')} onRetry={() => usersQuery.refetch()} />
       ) : visibleUsers.length === 0 ? (
-        <EmptyState message={search.trim() ? 'No users match this search.' : 'No users have been created yet.'} />
+        <EmptyState message={usersQuery.data.length === 0 ? 'No users have been created yet.' : 'No users match the current filters.'} />
       ) : (
         <div className="return-table-wrapper">
           <table className="return-table">
@@ -339,11 +408,13 @@ export function UsersPage() {
                 <tr key={user.id}>
                   <td>{user.name}</td>
                   <td>{user.email}</td>
-                  <td>{roleLabel(user.role)}</td>
+                  <td><span className={`users-role users-role--${user.role.toLowerCase()}`}>{roleLabel(user.role)}</span></td>
                   {/* An ADMIN never has a route — a neutral dash, not a blank cell. */}
                   <td>{user.role === 'ADMIN' ? '—' : routeLabel(user.route)}</td>
                   <td>
-                    <StatusBadge label={user.active ? 'Active' : 'Inactive'} />
+                    <span className={`users-status users-status--${user.active ? 'active' : 'inactive'}`}>
+                      <StatusBadge label={user.active ? 'Active' : 'Inactive'} />
+                    </span>
                   </td>
                   <td>
                     <div className="admin-row-actions">
