@@ -202,23 +202,26 @@ describe('App routing', () => {
 
   // JSDOM has no layout engine: guard the exact route-to-presentation contract
   // here; desktop browser checks cover the shared header's actual geometry.
-  it.each(['/dashboard', '/returns', '/returns?status=CLOSED', '/users'])(
-    'uses the shared compact header for the top-level page %s',
-    async (path) => {
-      saveRefreshToken('stored-refresh-token');
-      window.history.pushState({}, '', path);
-      if (path === '/dashboard') stubAuthenticatedFetch();
-      else stubAuthenticatedFetchWithReturn();
+  it.each([
+    ['/dashboard', 'Refresh'],
+    ['/returns', 'Refresh'],
+    ['/returns?status=CLOSED', 'Refresh'],
+    ['/users', 'Create user'],
+    ['/routes', 'Create route'],
+  ])('uses the shared compact header for the top-level page %s', async (path, primaryAction) => {
+    saveRefreshToken('stored-refresh-token');
+    window.history.pushState({}, '', path);
+    if (path === '/dashboard') stubAuthenticatedFetch();
+    else stubAuthenticatedFetchWithReturn();
 
-      render(<App />);
+    render(<App />);
 
-      const main = await screen.findByRole('main');
-      expect(main.parentElement).toHaveClass('app-shell__main--compact-header');
-      expect(screen.getAllByRole('button', { name: path === '/users' ? 'Create user' : 'Refresh' })).toHaveLength(1);
-    },
-  );
+    const main = await screen.findByRole('main');
+    expect(main.parentElement).toHaveClass('app-shell__main--compact-header');
+    expect(screen.getAllByRole('button', { name: primaryAction })).toHaveLength(1);
+  });
 
-  it.each([`/returns/${RETURN_DETAIL.id}`, '/users/not-a-page', '/routes', '/no-such-page'])(
+  it.each([`/returns/${RETURN_DETAIL.id}`, '/users/not-a-page', '/no-such-page'])(
     'keeps the normal shell header for %s',
     async (path) => {
       saveRefreshToken('stored-refresh-token');
@@ -232,7 +235,11 @@ describe('App routing', () => {
     },
   );
 
-  it.each(['Returns', 'Users'])('keeps one compact %s header and its active navigation when the sidebar is collapsed and expanded', async (pageName) => {
+  it.each([
+    ['Returns', 'Refresh'],
+    ['Users', 'Create user'],
+    ['Routes', 'Create route'],
+  ])('keeps one compact %s header and its active navigation when the sidebar is collapsed and expanded', async (pageName, primaryAction) => {
     saveRefreshToken('stored-refresh-token');
     window.history.pushState({}, '', `/${pageName.toLowerCase()}`);
     stubAuthenticatedFetchWithReturn();
@@ -247,7 +254,7 @@ describe('App routing', () => {
     await act(async () => { screen.getByRole('button', { name: 'Expand sidebar' }).click(); });
     expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getAllByRole('heading', { name: pageName })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: pageName === 'Users' ? 'Create user' : 'Refresh' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: primaryAction })).toHaveLength(1);
     expect(screen.getByRole('main').parentElement).toHaveClass('app-shell__main--compact-header');
   });
 

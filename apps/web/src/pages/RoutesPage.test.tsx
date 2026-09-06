@@ -91,6 +91,96 @@ describe('RoutesPage', () => {
     vi.unstubAllGlobals();
   });
 
+  it('renders the page heading and its subtitle', async () => {
+    stubFetch();
+    renderRoutesPage();
+
+    expect(await screen.findByRole('heading', { name: 'Routes', level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('Manage delivery routes')).toBeInTheDocument();
+  });
+
+  it('derives Total, Active, and Inactive counts from the complete loaded route list', async () => {
+    stubFetch({
+      routes: [
+        ACTIVE_ROUTE,
+        INACTIVE_ROUTE,
+        { ...ACTIVE_ROUTE, id: 'a2', code: 'R2', name: 'East Loop' },
+        { ...ACTIVE_ROUTE, id: 'a3', code: 'R3', name: 'West Loop' },
+      ],
+    });
+    renderRoutesPage();
+
+    const summary = await screen.findByRole('region', { name: 'Route summary' });
+    expect(within(summary).getByRole('heading', { name: 'Total routes' }).parentElement).toHaveTextContent('4');
+    expect(within(summary).getByRole('heading', { name: 'Active routes' }).parentElement).toHaveTextContent('3');
+    expect(within(summary).getByRole('heading', { name: 'Inactive routes' }).parentElement).toHaveTextContent('1');
+  });
+
+  it('reports zero counts rather than hiding the cards when no routes exist', async () => {
+    stubFetch({ routes: [] });
+    renderRoutesPage();
+
+    const summary = await screen.findByRole('region', { name: 'Route summary' });
+    expect(within(summary).getByRole('heading', { name: 'Total routes' }).parentElement).toHaveTextContent('0');
+    expect(within(summary).getByRole('heading', { name: 'Active routes' }).parentElement).toHaveTextContent('0');
+    expect(within(summary).getByRole('heading', { name: 'Inactive routes' }).parentElement).toHaveTextContent('0');
+  });
+
+  it('filters by route name case-insensitively without calling the API again', async () => {
+    stubFetch();
+    renderRoutesPage();
+    await screen.findByText('R1');
+    const listCallsBefore = callsMatching((url, init) => url.includes('/admin/routes') && (init?.method ?? 'GET') === 'GET').length;
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search routes' }), { target: { value: 'north' } });
+
+    expect(screen.getByText('North Loop')).toBeInTheDocument();
+    expect(screen.queryByText('Retired Loop')).not.toBeInTheDocument();
+    expect(callsMatching((url, init) => url.includes('/admin/routes') && (init?.method ?? 'GET') === 'GET')).toHaveLength(listCallsBefore);
+  });
+
+  it('filters by route code case-insensitively', async () => {
+    stubFetch();
+    renderRoutesPage();
+    await screen.findByText('R1');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search routes' }), { target: { value: 'r9' } });
+
+    expect(screen.getByText('Retired Loop')).toBeInTheDocument();
+    expect(screen.queryByText('North Loop')).not.toBeInTheDocument();
+  });
+
+  it('leaves the summary counts describing the whole population while a search is applied', async () => {
+    stubFetch();
+    renderRoutesPage();
+    await screen.findByText('R1');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search routes' }), { target: { value: 'north' } });
+
+    const summary = screen.getByRole('region', { name: 'Route summary' });
+    expect(within(summary).getByRole('heading', { name: 'Total routes' }).parentElement).toHaveTextContent('2');
+    expect(within(summary).getByRole('heading', { name: 'Active routes' }).parentElement).toHaveTextContent('1');
+    expect(within(summary).getByRole('heading', { name: 'Inactive routes' }).parentElement).toHaveTextContent('1');
+  });
+
+  it('distinguishes a search that matches nothing from a tenant with no routes at all', async () => {
+    stubFetch();
+    renderRoutesPage();
+    await screen.findByText('R1');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search routes' }), { target: { value: 'nothing-matches' } });
+
+    expect(screen.getByText('No routes match the current search.')).toBeInTheDocument();
+    expect(screen.queryByText('No routes have been created yet.')).not.toBeInTheDocument();
+  });
+
+  it('shows the loading state while the route list is in flight', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
+    renderRoutesPage();
+
+    expect(await screen.findByText('Loading routes…')).toBeInTheDocument();
+  });
+
   it('renders active and inactive routes with code, name, and status', async () => {
     stubFetch();
     renderRoutesPage();
@@ -101,6 +191,26 @@ describe('RoutesPage', () => {
 
     const inactiveRow = (await screen.findByText('R9')).closest('tr') as HTMLElement;
     expect(within(inactiveRow).getByText('Inactive')).toBeInTheDocument();
+  });
+
+  it('takes each row status from that route’s own active flag, never from a fixed position', async () => {
+    stubFetch({ routes: [INACTIVE_ROUTE, ACTIVE_ROUTE] });
+    renderRoutesPage();
+
+    const inactiveRow = (await screen.findByText('R9')).closest('tr') as HTMLElement;
+    expect(within(inactiveRow).getByText('Inactive').parentElement).toHaveClass('routes-status--inactive');
+
+    const activeRow = (await screen.findByText('R1')).closest('tr') as HTMLElement;
+    expect(within(activeRow).getByText('Active').parentElement).toHaveClass('routes-status--active');
+  });
+
+  it('offers exactly the Code, Name, Status, and Actions columns, with an Edit action per row', async () => {
+    stubFetch();
+    renderRoutesPage();
+    await screen.findByText('R1');
+
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Code', 'Name', 'Status', 'Actions']);
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2);
   });
 
   it('offers no delete action anywhere', async () => {

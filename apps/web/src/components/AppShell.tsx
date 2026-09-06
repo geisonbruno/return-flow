@@ -4,6 +4,9 @@ import { useAuth } from '../auth/AuthContext';
 import { NavigationGuardProvider, useNavigationGuard } from '../routes/navigationGuard';
 import { Icon, type IconName } from './Icon';
 
+/** The top-level pages that render their own compact header; a nested page (a return's details, say) keeps the normal shell header. */
+const COMPACT_HEADER_PATHS = new Set(['/dashboard', '/returns', '/users', '/routes']);
+
 function navLinkClassName({ isActive }: { isActive: boolean }): string {
   return isActive ? 'app-shell__nav-link app-shell__nav-link--active' : 'app-shell__nav-link';
 }
@@ -26,7 +29,7 @@ export function AppShell() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const hasCompactHeader = location.pathname === '/dashboard' || location.pathname === '/returns' || location.pathname === '/users';
+  const hasCompactHeader = COMPACT_HEADER_PATHS.has(location.pathname);
   const handleLogout = async () => {
     setLoggingOut(true);
     try { await logout(); } finally { setLoggingOut(false); }
