@@ -6,8 +6,10 @@ import { toSafeErrorMessage } from '../api/problemDetail';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorState } from '../components/ErrorState';
+import { Icon } from '../components/Icon';
 import { LoadingState } from '../components/LoadingState';
 import { StatusBadge } from '../components/StatusBadge';
+import './RoutesPage.css';
 
 /** Mirrors the backend's `@Size(max = 50)` / `@Size(max = 255)` on the route DTOs — client-side feedback only; the backend re-validates. */
 const CODE_MAX_LENGTH = 50;
@@ -53,6 +55,7 @@ export function RoutesPage() {
   const createRouteMutation = useCreateRoute();
   const updateRouteMutation = useUpdateRoute();
 
+  const [search, setSearch] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -65,6 +68,26 @@ export function RoutesPage() {
   const [deactivateConfirmOpen, setDeactivateConfirmOpen] = useState(false);
 
   const routes = useMemo(() => routesQuery.data ?? [], [routesQuery.data]);
+
+  /** Purely local narrowing of the already-loaded list — the route query itself is never re-issued with a search term. */
+  const visibleRoutes = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) {
+      return routes;
+    }
+    return routes.filter(
+      (route) => route.code.toLowerCase().includes(term) || (route.name?.toLowerCase().includes(term) ?? false),
+    );
+  }, [routes, search]);
+
+  // Counts describe the complete loaded population, never the searched rows.
+  const routeCounts = routesQuery.isSuccess
+    ? {
+        total: routes.length,
+        active: routes.filter((route) => route.active === true).length,
+        inactive: routes.filter((route) => route.active === false).length,
+      }
+    : null;
 
   const closeCreateDialog = () => {
     setCreateOpen(false);
@@ -154,13 +177,47 @@ export function RoutesPage() {
   };
 
   return (
-    <section className="admin-page">
-      <div className="page-header">
-        <h1>Routes</h1>
-        <button type="button" onClick={handleOpenCreate}>
-          Create route
+    <section className="admin-page routes-page">
+      <header className="compact-page-header routes-page__header">
+        <div>
+          <h1>Routes</h1>
+          <p>Manage delivery routes</p>
+        </div>
+        <button className="routes-page__create" type="button" onClick={handleOpenCreate}>
+          <span aria-hidden="true">+</span> Create route
         </button>
-      </div>
+      </header>
+
+      {routeCounts && (
+        <section className="routes-summary" aria-label="Route summary">
+          {([
+            { key: 'total', label: 'Total routes', count: routeCounts.total },
+            { key: 'active', label: 'Active routes', count: routeCounts.active },
+            { key: 'inactive', label: 'Inactive routes', count: routeCounts.inactive },
+          ] as const).map((card) => (
+            <article className={`routes-summary__card routes-summary__card--${card.key}`} key={card.key} aria-labelledby={`routes-summary-${card.key}`}>
+              <span className="routes-summary__icon">
+                {card.key === 'total' ? (
+                  <Icon name="routes" />
+                ) : card.key === 'active' ? (
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M8 5.5v13l11-6.5z" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="7" y="5" width="3.5" height="14" rx="1" />
+                    <rect x="13.5" y="5" width="3.5" height="14" rx="1" />
+                  </svg>
+                )}
+              </span>
+              <div>
+                <h2 id={`routes-summary-${card.key}`}>{card.label}</h2>
+                <p>{card.count}</p>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
 
       {feedback && (
         <p className="form-success" role="status">
@@ -168,12 +225,29 @@ export function RoutesPage() {
         </p>
       )}
 
+      <div className="routes-search">
+        <div className="form-field routes-search__field">
+          <label className="sr-only" htmlFor="routes-search">Search routes</label>
+          <svg className="routes-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="7" />
+            <path d="m16 16 5 5" />
+          </svg>
+          <input
+            id="routes-search"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by route name or code"
+          />
+        </div>
+      </div>
+
       {routesQuery.isPending ? (
         <LoadingState label="Loading routes…" />
       ) : routesQuery.isError ? (
         <ErrorState message={toSafeErrorMessage(routesQuery.error, 'Unable to load routes.')} onRetry={() => routesQuery.refetch()} />
-      ) : routes.length === 0 ? (
-        <EmptyState message="No routes have been created yet." />
+      ) : visibleRoutes.length === 0 ? (
+        <EmptyState message={routes.length === 0 ? 'No routes have been created yet.' : 'No routes match the current search.'} />
       ) : (
         <div className="return-table-wrapper">
           <table className="return-table">
@@ -186,12 +260,14 @@ export function RoutesPage() {
               </tr>
             </thead>
             <tbody>
-              {routes.map((route) => (
+              {visibleRoutes.map((route) => (
                 <tr key={route.id}>
                   <td>{route.code}</td>
                   <td>{route.name || '—'}</td>
                   <td>
-                    <StatusBadge label={route.active ? 'Active' : 'Inactive'} />
+                    <span className={`routes-status routes-status--${route.active ? 'active' : 'inactive'}`}>
+                      <StatusBadge label={route.active ? 'Active' : 'Inactive'} />
+                    </span>
                   </td>
                   <td>
                     <div className="admin-row-actions">
@@ -204,6 +280,9 @@ export function RoutesPage() {
               ))}
             </tbody>
           </table>
+          <p className="routes-table__count" role="status">
+            Showing {visibleRoutes.length} of {routes.length} {routes.length === 1 ? 'route' : 'routes'}
+          </p>
         </div>
       )}
 
