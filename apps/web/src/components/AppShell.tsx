@@ -26,7 +26,7 @@ export function AppShell() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const isDashboard = location.pathname === '/dashboard';
+  const hasCompactHeader = location.pathname === '/dashboard' || location.pathname === '/returns';
   const handleLogout = async () => {
     setLoggingOut(true);
     try { await logout(); } finally { setLoggingOut(false); }
@@ -48,7 +48,7 @@ export function AppShell() {
         </nav>
         {user && <div className="app-shell__sidebar-user"><span className="account-avatar">{initial}1</span><span><strong>{user.fullName}</strong><small>Administrator</small></span></div>}
       </aside>
-      <div className={`app-shell__main${isDashboard ? ' app-shell__main--dashboard' : ''}`}>
+      <div className={`app-shell__main${hasCompactHeader ? ' app-shell__main--compact-header' : ''}`}>
         <header className="app-shell__topbar">
           <button type="button" className="icon-button app-shell__collapse" onClick={() => setCollapsed((value) => !value)} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}><Icon name="menu"/></button>
           <details className="account-menu">

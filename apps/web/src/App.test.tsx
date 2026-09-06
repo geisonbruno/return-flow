@@ -200,6 +200,57 @@ describe('App routing', () => {
     expect(within(nav).getByRole('link', { name: 'Routes' })).toBeInTheDocument();
   });
 
+  // JSDOM has no layout engine: guard the exact route-to-presentation contract
+  // here; desktop browser checks cover the shared header's actual geometry.
+  it.each(['/dashboard', '/returns', '/returns?status=CLOSED'])(
+    'uses the shared compact header for the top-level page %s',
+    async (path) => {
+      saveRefreshToken('stored-refresh-token');
+      window.history.pushState({}, '', path);
+      if (path === '/dashboard') stubAuthenticatedFetch();
+      else stubAuthenticatedFetchWithReturn();
+
+      render(<App />);
+
+      const main = await screen.findByRole('main');
+      expect(main.parentElement).toHaveClass('app-shell__main--compact-header');
+      expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
+    },
+  );
+
+  it.each([`/returns/${RETURN_DETAIL.id}`, '/users', '/routes', '/no-such-page'])(
+    'keeps the normal shell header for %s',
+    async (path) => {
+      saveRefreshToken('stored-refresh-token');
+      window.history.pushState({}, '', path);
+      stubAuthenticatedFetchWithReturn();
+
+      render(<App />);
+
+      const main = await screen.findByRole('main');
+      expect(main.parentElement).not.toHaveClass('app-shell__main--compact-header');
+    },
+  );
+
+  it('keeps one compact Returns header and its active navigation when the sidebar is collapsed and expanded', async () => {
+    saveRefreshToken('stored-refresh-token');
+    window.history.pushState({}, '', '/returns');
+    stubAuthenticatedFetchWithReturn();
+    render(<App />);
+    await screen.findByRole('heading', { name: /^Returns$/ });
+
+    await act(async () => { screen.getByRole('button', { name: 'Collapse sidebar' }).click(); });
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('link', { name: 'Returns' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('main').parentElement).toHaveClass('app-shell__main--compact-header');
+
+    await act(async () => { screen.getByRole('button', { name: 'Expand sidebar' }).click(); });
+    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('heading', { name: /^Returns$/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
+    expect(screen.getByRole('main').parentElement).toHaveClass('app-shell__main--compact-header');
+  });
+
   it('logs out and redirects back to /login', async () => {
     saveRefreshToken('stored-refresh-token');
     window.history.pushState({}, '', '/dashboard');
