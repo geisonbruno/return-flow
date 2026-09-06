@@ -194,7 +194,9 @@ No `DRAFT` status, partial-decision persistence, `localStorage` persistence, or 
 
 **User management:**
 
-- List users (paginated, tenant-scoped)
+- List users (tenant-scoped, one loaded administration array; no pagination or sorting)
+- Three read-only summary counts — Total users, Active, Inactive — derived from that complete array, independent of the visible-row filters; no trends, percentages, navigation, or additional API
+- Combined client-side name/email search and Role, Status, and Route filters; route options come from the existing administration routes query, with no special "No route" filter option
 - Create user (name, email, role, route if DRIVER)
 - Edit permitted fields (name, route)
 - Activate/deactivate

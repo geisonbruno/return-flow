@@ -51,6 +51,14 @@ const DRIVER_USER = {
   updatedAt: '2026-01-01T00:00:00Z',
 };
 
+const FILTER_USERS = [
+  ADMIN_USER,
+  DRIVER_USER,
+  { ...DRIVER_USER, id: 'driver-2', name: 'Ina Driver', email: 'ina@warehouse.example', active: false, route: INACTIVE_ROUTE },
+  { ...DRIVER_USER, id: 'driver-3', name: 'Dee Driver', email: 'dee@warehouse.example', active: false },
+  { ...ADMIN_USER, id: 'admin-3', name: 'Idle Admin', email: 'idle@warehouse.example', active: false },
+];
+
 interface StubOptions {
   users?: unknown[];
   routes?: unknown[];
@@ -177,6 +185,100 @@ describe('UsersPage', () => {
     expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
   });
 
+  it('renders the Users heading/subtitle and exactly the six approved table columns', async () => {
+    stubFetch();
+    renderUsersPage();
+
+    expect(screen.getByRole('heading', { name: 'Users' })).toBeInTheDocument();
+    expect(screen.getByText('Manage system users and their access permissions')).toBeInTheDocument();
+    const table = await screen.findByRole('table');
+    expect(within(table).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(['Name', 'Email', 'Role', 'Route', 'Status', 'Actions']);
+    expect(screen.queryByRole('navigation', { name: /pagination/i })).not.toBeInTheDocument();
+  });
+
+  it('derives all three non-interactive summary counts from the complete population, independent of filters', async () => {
+    stubFetch({ users: FILTER_USERS, routes: [ACTIVE_ROUTE, INACTIVE_ROUTE] });
+    renderUsersPage();
+    await screen.findByText('Dana Driver');
+
+    const assertCounts = () => {
+      const summary = screen.getByRole('region', { name: 'User summary' });
+      expect(within(summary).getAllByRole('article')).toHaveLength(3);
+      for (const [label, count] of [['Total users', '5'], ['Active', '2'], ['Inactive', '3']]) {
+        expect(within(within(summary).getByRole('article', { name: label })).getByText(count)).toBeInTheDocument();
+      }
+      expect(within(summary).queryByRole('button')).not.toBeInTheDocument();
+      expect(within(summary).queryByRole('link')).not.toBeInTheDocument();
+    };
+    assertCounts();
+    const callsBefore = vi.mocked(fetch).mock.calls.length;
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'dee@' } });
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'DRIVER' } });
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'inactive' } });
+    fireEvent.change(screen.getByLabelText('Route'), { target: { value: ROUTE_ID } });
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(2);
+    expect(screen.getByText('Dee Driver')).toBeInTheDocument();
+    assertCounts();
+    expect(vi.mocked(fetch).mock.calls.length).toBe(callsBefore);
+  });
+
+  it.each([
+    ['Role', 'ADMIN', ['Bob Admin', 'Idle Admin']],
+    ['Role', 'DRIVER', ['Dana Driver', 'Ina Driver', 'Dee Driver']],
+    ['Status', 'active', ['Bob Admin', 'Dana Driver']],
+    ['Status', 'inactive', ['Ina Driver', 'Dee Driver', 'Idle Admin']],
+    ['Route', ROUTE_ID, ['Dana Driver', 'Dee Driver']],
+    ['Route', INACTIVE_ROUTE_ID, ['Ina Driver']],
+  ])('filters the loaded population by %s = %s without new requests', async (label, value, expectedNames) => {
+    stubFetch({ users: FILTER_USERS, routes: [ACTIVE_ROUTE, INACTIVE_ROUTE] });
+    renderUsersPage();
+    await screen.findByText('Dana Driver');
+    await screen.findByRole('option', { name: 'R9 — Retired Loop' });
+    const callsBefore = vi.mocked(fetch).mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText(label as string), { target: { value } });
+
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+    expect(rows.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual(expectedNames);
+    expect(vi.mocked(fetch).mock.calls.length).toBe(callsBefore);
+    expect(screen.queryByRole('option', { name: 'No route' })).not.toBeInTheDocument();
+  });
+
+  it('shows a filtered empty state for incompatible filters and restores rows when a filter is cleared', async () => {
+    stubFetch();
+    renderUsersPage();
+    await screen.findByText('Dana Driver');
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'ADMIN' } });
+    fireEvent.change(screen.getByLabelText('Route'), { target: { value: ROUTE_ID } });
+    expect(screen.getByText('No users match the current filters.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Route'), { target: { value: '' } });
+    expect(screen.getByText('Bob Admin')).toBeInTheDocument();
+    expect(screen.queryByText('Dana Driver')).not.toBeInTheDocument();
+  });
+
+  it('shows honest zero counts and the existing empty-tenant message for an empty loaded list', async () => {
+    stubFetch({ users: [] });
+    renderUsersPage();
+    await screen.findByText('No users have been created yet.');
+    expect(within(screen.getByRole('region', { name: 'User summary' })).getAllByText('0')).toHaveLength(3);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('does not fabricate summary counts while the users list is loading', async () => {
+    let resolveUsers!: (response: Response) => void;
+    const response = new Promise<Response>((resolve) => { resolveUsers = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : (input as Request).url;
+      return url.includes('/admin/users') ? response : jsonResponse(200, [ACTIVE_ROUTE]);
+    }));
+    renderUsersPage();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading users…');
+    expect(screen.queryByRole('region', { name: 'User summary' })).not.toBeInTheDocument();
+    await act(async () => { resolveUsers(jsonResponse(200, [ADMIN_USER])); });
+    expect(await screen.findByText('Bob Admin')).toBeInTheDocument();
+  });
+
   it('creating an ADMIN sends no routeId and hides the route field', async () => {
     stubFetch({ onCreateUser: (body) => jsonResponse(201, { ...ADMIN_USER, ...(body as object), id: 'new-admin' }) });
     renderUsersPage();
@@ -186,10 +288,10 @@ describe('UsersPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create user' }));
     });
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'ADMIN' } });
+      fireEvent.change(dialog().getByLabelText('Role'), { target: { value: 'ADMIN' } });
     });
 
-    expect(screen.queryByLabelText('Route')).not.toBeInTheDocument();
+    expect(dialog().queryByLabelText('Route')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New Admin' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new.admin@warehouse.example' } });
@@ -226,7 +328,7 @@ describe('UsersPage', () => {
     expect(callsMatching((url, init) => url.includes('/admin/users') && init?.method === 'POST')).toHaveLength(0);
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Route'), { target: { value: ROUTE_ID } });
+      fireEvent.change(dialog().getByLabelText('Route'), { target: { value: ROUTE_ID } });
     });
     await act(async () => {
       fireEvent.click(dialog().getByRole('button', { name: 'Create user' }));
@@ -252,7 +354,7 @@ describe('UsersPage', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new.driver@warehouse.example' } });
     fireEvent.change(screen.getByLabelText('Temporary password'), { target: { value: 'temp-password-1' } });
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Route'), { target: { value: ROUTE_ID } });
+      fireEvent.change(dialog().getByLabelText('Route'), { target: { value: ROUTE_ID } });
     });
     await act(async () => {
       fireEvent.click(dialog().getByRole('button', { name: 'Create user' }));
@@ -270,6 +372,26 @@ describe('UsersPage', () => {
     expect(screen.getByLabelText('Temporary password')).toHaveValue('');
   });
 
+  it('preserves the temporary-password minimum and the create password visibility control', async () => {
+    stubFetch();
+    renderUsersPage();
+    await screen.findByText('Dana Driver');
+    fireEvent.click(screen.getByRole('button', { name: 'Create user' }));
+    fireEvent.change(dialog().getByLabelText('Role'), { target: { value: 'ADMIN' } });
+    fireEvent.change(dialog().getByLabelText('Name'), { target: { value: 'New Admin' } });
+    fireEvent.change(dialog().getByLabelText('Email'), { target: { value: 'new@warehouse.example' } });
+    const password = dialog().getByLabelText('Temporary password');
+    fireEvent.change(password, { target: { value: 'short' } });
+    expect(password).toHaveAttribute('type', 'password');
+    fireEvent.click(dialog().getByRole('button', { name: 'Show password' }));
+    expect(password).toHaveAttribute('type', 'text');
+    fireEvent.click(dialog().getByRole('button', { name: 'Hide password' }));
+    expect(password).toHaveAttribute('type', 'password');
+    fireEvent.click(dialog().getByRole('button', { name: 'Create user' }));
+    expect(dialog().getByRole('alert')).toHaveTextContent('Temporary password must be at least 8 characters.');
+    expect(callsMatching((_url, init) => init?.method === 'POST')).toHaveLength(0);
+  });
+
   it('surfaces a backend create failure without closing the dialog', async () => {
     stubFetch({
       onCreateUser: () =>
@@ -285,7 +407,7 @@ describe('UsersPage', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'dana@warehouse.example' } });
     fireEvent.change(screen.getByLabelText('Temporary password'), { target: { value: 'temp-password-1' } });
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Route'), { target: { value: ROUTE_ID } });
+      fireEvent.change(dialog().getByLabelText('Route'), { target: { value: ROUTE_ID } });
     });
     await act(async () => {
       fireEvent.click(dialog().getByRole('button', { name: 'Create user' }));
@@ -308,7 +430,7 @@ describe('UsersPage', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'not-an-email' } });
     fireEvent.change(screen.getByLabelText('Temporary password'), { target: { value: 'temp-password-1' } });
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Route'), { target: { value: ROUTE_ID } });
+      fireEvent.change(dialog().getByLabelText('Route'), { target: { value: ROUTE_ID } });
     });
     await act(async () => {
       fireEvent.click(dialog().getByRole('button', { name: 'Create user' }));
@@ -325,9 +447,9 @@ describe('UsersPage', () => {
 
     expect(screen.getByLabelText('Name')).toHaveValue('Dana Driver');
     expect(screen.getByLabelText('Email')).toHaveValue('dana@warehouse.example');
-    expect(screen.getByLabelText('Role')).toHaveValue('DRIVER');
-    expect(screen.getByLabelText('Route')).toHaveValue(ROUTE_ID);
-    expect(screen.getByLabelText('Active')).toBeChecked();
+    expect(dialog().getByLabelText('Role')).toHaveValue('DRIVER');
+    expect(dialog().getByLabelText('Route')).toHaveValue(ROUTE_ID);
+    expect(screen.getByRole('checkbox', { name: 'Active' })).toBeChecked();
   });
 
   it('changing DRIVER to ADMIN clears the route and sends routeId null on save', async () => {
@@ -336,9 +458,9 @@ describe('UsersPage', () => {
     await openEditFor('Dana Driver');
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'ADMIN' } });
+      fireEvent.change(dialog().getByLabelText('Role'), { target: { value: 'ADMIN' } });
     });
-    expect(screen.queryByLabelText('Route')).not.toBeInTheDocument();
+    expect(dialog().queryByLabelText('Route')).not.toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -356,7 +478,7 @@ describe('UsersPage', () => {
     await openEditFor('Bob Admin');
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'DRIVER' } });
+      fireEvent.change(dialog().getByLabelText('Role'), { target: { value: 'DRIVER' } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -366,7 +488,7 @@ describe('UsersPage', () => {
     expect(callsMatching((_url, init) => init?.method === 'PUT')).toHaveLength(0);
 
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Route'), { target: { value: ROUTE_ID } });
+      fireEvent.change(dialog().getByLabelText('Route'), { target: { value: ROUTE_ID } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -399,7 +521,7 @@ describe('UsersPage', () => {
     await openEditFor('Dana Driver');
 
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Active'));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Active' }));
     });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -436,8 +558,8 @@ describe('UsersPage', () => {
     renderUsersPage();
     await openEditFor('Ada Admin');
 
-    expect(screen.getByLabelText('Role')).toBeDisabled();
-    expect(screen.getByLabelText('Active')).toBeDisabled();
+    expect(dialog().getByLabelText('Role')).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Active' })).toBeDisabled();
     expect(screen.getByText('You cannot change your own role or deactivate your own account.')).toBeInTheDocument();
   });
 
@@ -466,8 +588,8 @@ describe('UsersPage', () => {
     renderUsersPage();
     await openEditFor('Dana Driver');
 
-    expect(screen.getByLabelText('Route')).toHaveValue(INACTIVE_ROUTE_ID);
-    expect(screen.getByRole('option', { name: 'R9 — Retired Loop (inactive)' })).toBeInTheDocument();
+    expect(dialog().getByLabelText('Route')).toHaveValue(INACTIVE_ROUTE_ID);
+    expect(dialog().getByRole('option', { name: 'R9 — Retired Loop (inactive)' })).toBeInTheDocument();
   });
 
   it('does not offer an unrelated inactive route when assigning a driver', async () => {
@@ -475,8 +597,8 @@ describe('UsersPage', () => {
     renderUsersPage();
     await openEditFor('Dana Driver');
 
-    expect(screen.getByRole('option', { name: 'R1 — North Loop' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: /Retired Loop/ })).not.toBeInTheDocument();
+    expect(dialog().getByRole('option', { name: 'R1 — North Loop' })).toBeInTheDocument();
+    expect(dialog().queryByRole('option', { name: /Retired Loop/ })).not.toBeInTheDocument();
   });
 
   it('reset password rejects a mismatched confirmation before sending anything', async () => {
@@ -540,12 +662,31 @@ describe('UsersPage', () => {
     expect(screen.getByText('Password reset for "Dana Driver".')).toBeInTheDocument();
   });
 
-  it('filters the table by name or email', async () => {
+  it('preserves reset-password visibility and discards password drafts on cancellation', async () => {
+    stubFetch();
+    renderUsersPage();
+    const row = (await screen.findByText('Dana Driver')).closest('tr') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Reset password' }));
+    fireEvent.change(dialog().getByLabelText('New password'), { target: { value: 'draft-password' } });
+    fireEvent.change(dialog().getByLabelText('Confirm new password'), { target: { value: 'draft-password' } });
+    fireEvent.click(dialog().getByRole('button', { name: 'Show passwords' }));
+    expect(dialog().getByLabelText('New password')).toHaveAttribute('type', 'text');
+    expect(dialog().getByLabelText('Confirm new password')).toHaveAttribute('type', 'text');
+    fireEvent.click(dialog().getByRole('button', { name: 'Hide passwords' }));
+    expect(dialog().getByLabelText('New password')).toHaveAttribute('type', 'password');
+    fireEvent.click(dialog().getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(within(row).getByRole('button', { name: 'Reset password' }));
+    expect(dialog().getByLabelText('New password')).toHaveValue('');
+    expect(dialog().getByLabelText('Confirm new password')).toHaveValue('');
+    expect(callsMatching((url) => url.includes('/reset-password'))).toHaveLength(0);
+  });
+
+  it.each(['bob@', '  bOB  '])('preserves case-insensitive name/email search for "%s"', async (search) => {
     stubFetch();
     renderUsersPage();
     await screen.findByText('Dana Driver');
 
-    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bob@' } });
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: search } });
 
     expect(screen.getByText('Bob Admin')).toBeInTheDocument();
     expect(screen.queryByText('Dana Driver')).not.toBeInTheDocument();
@@ -567,5 +708,6 @@ describe('UsersPage', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'User summary' })).not.toBeInTheDocument();
   });
 });

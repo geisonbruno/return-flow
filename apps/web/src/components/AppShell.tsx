@@ -26,7 +26,7 @@ export function AppShell() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const hasCompactHeader = location.pathname === '/dashboard' || location.pathname === '/returns';
+  const hasCompactHeader = location.pathname === '/dashboard' || location.pathname === '/returns' || location.pathname === '/users';
   const handleLogout = async () => {
     setLoggingOut(true);
     try { await logout(); } finally { setLoggingOut(false); }
