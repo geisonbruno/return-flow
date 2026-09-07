@@ -149,7 +149,7 @@ describe('App routing', () => {
 
     render(<App />);
 
-    await waitFor(() => expect(screen.getByText('Admin sign in')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Sign in to your account')).toBeInTheDocument());
     expect(window.location.pathname).toBe('/login');
   });
 
@@ -161,7 +161,7 @@ describe('App routing', () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument());
-    expect(screen.queryByText('Admin sign in')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sign in to your account')).not.toBeInTheDocument();
   });
 
   it('redirects an authenticated ADMIN away from /login to /dashboard', async () => {
@@ -273,7 +273,7 @@ describe('App routing', () => {
       screen.getByRole('button', { name: 'Log out' }).click();
     });
 
-    await waitFor(() => expect(screen.getByText('Admin sign in')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Sign in to your account')).toBeInTheDocument());
     expect(window.location.pathname).toBe('/login');
   });
 
