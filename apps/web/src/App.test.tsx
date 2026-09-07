@@ -221,7 +221,29 @@ describe('App routing', () => {
     expect(screen.getAllByRole('button', { name: primaryAction })).toHaveLength(1);
   });
 
-  it.each([`/returns/${RETURN_DETAIL.id}`, '/users/not-a-page', '/no-such-page'])(
+  it('uses the same compact header for the nested Return Details page, with one hamburger and one account control', async () => {
+    saveRefreshToken('stored-refresh-token');
+    window.history.pushState({}, '', `/returns/${RETURN_DETAIL.id}`);
+    stubAuthenticatedFetchWithReturn();
+
+    render(<App />);
+
+    const main = await screen.findByRole('main');
+    expect(main.parentElement).toHaveClass('app-shell__main--compact-header');
+
+    // Everything belongs to that one band — no second title/action row, and
+    // the shell's own controls are never duplicated by the page.
+    await screen.findByRole('heading', { name: RETURN_DETAIL.returnNumber });
+    expect(screen.getByRole('link', { name: '← Back to Returns' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Collapse sidebar' })).toHaveLength(1);
+    expect(screen.getAllByText('Ada Admin', { selector: '.account-menu summary span' })).toHaveLength(1);
+    expect(screen.getByText('Awaiting warehouse')).toBeInTheDocument();
+  });
+
+  // A path only opts in when the router really resolves it to a compact page:
+  // an unmatched path is still the normal shell header.
+  it.each(['/users/not-a-page', '/no-such-page', `/returns/${RETURN_DETAIL.id}/extra`])(
     'keeps the normal shell header for %s',
     async (path) => {
       saveRefreshToken('stored-refresh-token');

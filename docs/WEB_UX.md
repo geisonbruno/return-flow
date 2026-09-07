@@ -57,7 +57,7 @@ This document is the Web UX checkpoint required before Phase 6 begins (`docs/IMP
 - **Logout:** a fixed control in the shell (e.g. top-right), always reachable, never inside a nested menu.
 - **Tenant identity:** the tenant name shown once in the shell header — never a tenant switcher or selector (root `CLAUDE.md` §21.1: the client never chooses a tenant).
 - **Page titles:** each route sets a concise browser title ("ReturnFlow — Dashboard", "ReturnFlow — Return RF-000123").
-- **Breadcrumbs:** only on Return Details ("Returns / RF-000123") — nowhere else, since no other route is nested.
+- **Back navigation:** only on Return Details, as a single "← Back to Returns" link inside its own compact header that returns to the Returns list with its filters/query preserved — nowhere else, since no other route is nested.
 
 ## 4. Authentication and session behavior
 
@@ -245,7 +245,7 @@ No stack trace, filesystem path, storage key, token, database detail, or interna
 
 ## 11. Responsive behavior
 
-- **Desktop** (approved and implemented): the unauthenticated Login card, plus the persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows. The compact top-level header is shared by `/dashboard`, `/returns`, `/users`, and `/routes`; nested pages keep the normal shell header.
+- **Desktop** (approved and implemented): the unauthenticated Login card, plus the persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows. The compact header is shared by the top-level `/dashboard`, `/returns`, `/users`, and `/routes` and by the one nested Return Details page, which opts in by matching the `/returns/:returnId` route *pattern*; any other nested or unmatched path still keeps the normal shell header.
 - **Tablet:** adaptation remains future work; no tablet layout is approved by the Dashboard redesign.
 - **Small browser viewport (phone-width browser):** adaptation remains future work; the driver-facing mobile app remains the approved phone workflow.
 
@@ -310,13 +310,27 @@ No remember-me, forgot-password, signup, social login, or tenant selector appear
 
 ### Return Details
 
-- **Header:** breadcrumb (Returns / RF-000123), status badge
+- **Header:** the compact authenticated header — shell hamburger, "← Back to Returns", the return number, the real status badge, page-local Refresh, and the shell account control
 - **Primary content:** the information hierarchy from §7
 - **Primary action:** Start Review (while waiting) or the active review's Close/Cancel (while in review, owner only)
-- **Secondary actions:** Release Review, Take Over Review, Download PDF (closed only, Phase 9)
+- **Secondary actions:** Release Review, Take Over Review, view a photo full-size, Download PDF (closed only, Phase 9)
 - **Loading:** full-page skeleton
 - **Empty:** "No photos yet." / "Signature pending." per §7
 - **Failure:** "This return could not be found." for 404-equivalent; inline retry for a media-fetch failure only
+
+#### Desktop visual pattern
+
+The desktop Return Details page is **developer-reviewed and approved**.
+
+Return Details renders the same compact authenticated header as the top-level pages, in one single row: the shell's own hamburger, "← Back to Returns", the return number, the real status badge (colour-coded by the return's own status), a page-local Refresh, and the shell's account control at the far right. There is no second title/action row and no duplicated hamburger or account control. It is the only nested page with that presentation, and it opts in by matching the `/returns/:returnId` route pattern rather than by raw pathname, so an unmatched path such as `/users/not-a-page` or anything deeper than the pattern still keeps the normal shell header.
+
+Below the header, two equal desktop columns: Return information and Driver and route on the left, Photos and Customer signature on the right. The Warehouse review card sits below both columns and always spans the full page width.
+
+**Start Review never leaves this page.** It expands that same warehouse review card in place — into the ownership line, the four Yes/No decisions, warehouse observation, representative name, and the signature pad with Undo/Clear — while every information card above stays exactly where it is. There is no separate warehouse-review route, screen, or modal; the inline same-page review workflow is the approved MVP shape.
+
+A photo thumbnail that has **loaded successfully** is an accessible control ("View return photo N", keyboard included) that opens one large image in a dedicated dark-backdrop preview dialog, closed by its Close control, Escape, or a backdrop click. The preview loads through the same authenticated media path as the thumbnail, so the private `contentPath` is never used as a public image source. Loading and failed thumbnails stay non-interactive and keep their inline retry. There is no carousel, zoom, download, or new dependency.
+
+Desktop only: the consolidated responsive Web adaptation remains deferred.
 
 ### Users
 

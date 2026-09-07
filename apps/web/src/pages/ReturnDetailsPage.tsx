@@ -6,6 +6,8 @@ import { ApiError, toReviewConflictMessage, toSafeErrorMessage } from '../api/pr
 import { AuthenticatedImage } from '../components/AuthenticatedImage';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { ErrorState } from '../components/ErrorState';
+import { Icon } from '../components/Icon';
+import { ImagePreviewDialog } from '../components/ImagePreviewDialog';
 import { LoadingState } from '../components/LoadingState';
 import { ReturnPdfAction } from '../components/ReturnPdfAction';
 import { StatusBadge } from '../components/StatusBadge';
@@ -19,6 +21,7 @@ import { formatSydneyTimestamp } from '../returns/sydneyDate';
 import type { AdminReturnDetail, SignatureStroke } from '../returns/types';
 import { useNavigationGuard } from '../routes/navigationGuard';
 import { sanitizeRedirectTarget } from '../routes/safeRedirect';
+import './ReturnDetailsPage.css';
 
 const NOT_FOUND_MESSAGE = 'This return could not be found.';
 const FORBIDDEN_MESSAGE = "You don't have permission to do this.";
@@ -67,6 +70,67 @@ function isFormDirty(form: WarehouseFormState): boolean {
 
 function yesNo(value: boolean | null): string {
   return value === null ? '—' : value ? 'Yes' : 'No';
+}
+
+/**
+ * Page-local decorative marks for the card headings and review controls that
+ * the shared `Icon` set does not cover (it carries only navigation/status
+ * glyphs). Same page-scoped approach `LoginPage` already uses for its field
+ * marks — no icon library, no new dependency, and always `aria-hidden`, so
+ * each one only ever decorates a control that already has a real text label.
+ */
+type DetailIconName = 'photos' | 'signature' | 'clock' | 'play' | 'undo' | 'trash';
+
+function DetailIcon({ name, className = 'return-details-section__icon' }: { name: DetailIconName; className?: string }) {
+  const glyphs: Record<DetailIconName, React.ReactNode> = {
+    photos: (
+      <>
+        <rect x="3" y="4.5" width="18" height="15" rx="2" />
+        <circle cx="8.5" cy="10" r="1.6" />
+        <path d="m4 17 4.8-4.6a1.6 1.6 0 0 1 2.2 0L16 17M14 14.2l1.6-1.5a1.6 1.6 0 0 1 2.2 0L20 15" />
+      </>
+    ),
+    signature: (
+      <>
+        <path d="M4 19.5h16" />
+        <path d="M6.5 16.2 16.1 6.6a1.9 1.9 0 0 1 2.7 2.7L9.2 18.9l-3.6.9z" />
+      </>
+    ),
+    clock: (
+      <>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3 1.8" />
+      </>
+    ),
+    play: <path d="M8.5 5.6v12.8l10-6.4z" />,
+    undo: (
+      <>
+        <path d="M4 9h7.5a5 5 0 0 1 0 10H7" />
+        <path d="m7.5 5.5-3.5 3.5 3.5 3.5" />
+      </>
+    ),
+    trash: (
+      <>
+        <path d="M4 6.8h16M9.5 6.8V4.5h5v2.3" />
+        <path d="M6.4 6.8 7.3 20h9.4l.9-13.2" />
+        <path d="M10.4 10.5v6M13.6 10.5v6" />
+      </>
+    ),
+  };
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill={name === 'play' ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {glyphs[name]}
+    </svg>
+  );
 }
 
 export function ReturnDetailsPage() {
@@ -283,7 +347,13 @@ export function ReturnDetailsPage() {
 
   return (
     <section className="return-details-page">
-      <div className="page-header">
+      {/* The same compact authenticated header the top-level pages use: the
+          shell's own hamburger and account control overlay this one band, so
+          Back to Returns, the return number, the real status badge and
+          Refresh all sit on that single row. Refresh stays an ordinary page
+          action calling this page's own query — no shell action slot, and no
+          duplicated hamburger or account control. */}
+      <header className="compact-page-header return-details-page__header">
         <div className="return-details-page__heading">
           <Link to={backTo} className="return-details-page__back" onClick={handleBackClick}>
             ← Back to Returns
@@ -291,19 +361,20 @@ export function ReturnDetailsPage() {
           {!notFound && !forbidden && detail && (
             <div className="return-details-page__title">
               <h1>{detail.returnNumber}</h1>
-              <StatusBadge label={STATUS_LABELS[detail.status]} />
+              <StatusBadge status={detail.status} label={STATUS_LABELS[detail.status]} />
             </div>
           )}
         </div>
-        <button type="button" onClick={() => detailQuery.refetch()} disabled={!validId}>
+        <button type="button" className="return-details-page__refresh" onClick={() => detailQuery.refetch()} disabled={!validId}>
+          <Icon name="refresh" />
           Refresh
         </button>
-      </div>
+      </header>
 
       {notFound ? (
-        <p>{NOT_FOUND_MESSAGE}</p>
+        <p className="return-details-page__notice">{NOT_FOUND_MESSAGE}</p>
       ) : forbidden ? (
-        <p>{FORBIDDEN_MESSAGE}</p>
+        <p className="return-details-page__notice">{FORBIDDEN_MESSAGE}</p>
       ) : detailQuery.isPending ? (
         <LoadingState label="Loading return details…" />
       ) : detailQuery.isError ? (
@@ -431,94 +502,130 @@ function ReturnDetailsContent({
 }: ReturnDetailsContentProps) {
   const sortedPhotos = [...detail.photos].sort((a, b) => a.position - b.position);
   const isOwner = detail.status === 'IN_REVIEW' && detail.reviewer !== null && detail.reviewer.id === currentUserId;
+  // Which photo the large preview is showing, by its position in `sortedPhotos`
+  // — browser-only view state, never part of the return's own data.
+  const [previewPhotoIndex, setPreviewPhotoIndex] = useState<number | null>(null);
+  const previewPhoto = previewPhotoIndex === null ? undefined : sortedPhotos[previewPhotoIndex];
 
   return (
     <div className="return-details-content">
-      <section className="return-details-section">
-        <h2>Return information</h2>
-        <dl className="detail-list">
-          <div>
-            <dt>Customer</dt>
-            <dd>{detail.customerName}</dd>
-          </div>
-          <div>
-            <dt>Product</dt>
-            <dd>{detail.productName}</dd>
-          </div>
-          <div>
-            <dt>Quantity</dt>
-            <dd>{formatQuantityAndUnit(detail.quantity, detail.unit)}</dd>
-          </div>
-          <div>
-            <dt>Reason</dt>
-            <dd>{REASON_LABELS[detail.reason]}</dd>
-          </div>
-          {detail.reasonDetails && (
-            <div>
-              <dt>Reason details</dt>
-              <dd>{detail.reasonDetails}</dd>
-            </div>
-          )}
-          <div>
-            <dt>Observation</dt>
-            <dd className="detail-list__preserve-lines">{detail.observation || 'No observation.'}</dd>
-          </div>
-          <div>
-            <dt>Created</dt>
-            <dd>{formatSydneyTimestamp(detail.createdAt)} (Sydney time)</dd>
-          </div>
-        </dl>
-      </section>
+      {/* Desktop two-column information layout. The warehouse review card
+          below sits outside this grid, so it always spans the full page width
+          and Start Review expands that same card in place — the information
+          cards above stay exactly where they are. */}
+      <div className="return-details-grid">
+        <div className="return-details-column">
+          <section className="return-details-section">
+            <h2 className="return-details-section__heading">
+              <Icon name="review" className="return-details-section__icon" />
+              Return information
+            </h2>
+            <dl className="detail-list">
+              <div>
+                <dt>Customer</dt>
+                <dd>{detail.customerName}</dd>
+              </div>
+              <div>
+                <dt>Product</dt>
+                <dd>{detail.productName}</dd>
+              </div>
+              <div>
+                <dt>Quantity</dt>
+                <dd>{formatQuantityAndUnit(detail.quantity, detail.unit)}</dd>
+              </div>
+              <div>
+                <dt>Reason</dt>
+                <dd>{REASON_LABELS[detail.reason]}</dd>
+              </div>
+              {detail.reasonDetails && (
+                <div>
+                  <dt>Reason details</dt>
+                  <dd>{detail.reasonDetails}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Observation</dt>
+                <dd className="detail-list__preserve-lines">{detail.observation || 'No observation.'}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatSydneyTimestamp(detail.createdAt)} (Sydney time)</dd>
+              </div>
+            </dl>
+          </section>
 
-      <section className="return-details-section">
-        <h2>Driver and route</h2>
-        <dl className="detail-list">
-          <div>
-            <dt>Driver</dt>
-            <dd>{detail.driver.fullName}</dd>
-          </div>
-          <div>
-            <dt>Route</dt>
-            <dd>
-              {detail.route.code} — {detail.route.name}
-            </dd>
-          </div>
-        </dl>
-      </section>
+          <section className="return-details-section">
+            <h2 className="return-details-section__heading">
+              <Icon name="users" className="return-details-section__icon" />
+              Driver and route
+            </h2>
+            <dl className="detail-list">
+              <div>
+                <dt>Driver</dt>
+                <dd>{detail.driver.fullName}</dd>
+              </div>
+              <div>
+                <dt>Route</dt>
+                <dd>
+                  {detail.route.code} — {detail.route.name}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </div>
 
-      <section className="return-details-section">
-        <h2>Photos ({detail.photos.length})</h2>
-        {sortedPhotos.length === 0 ? (
-          <p>No photos yet.</p>
-        ) : (
-          <div className="photo-grid">
-            {sortedPhotos.map((photo, index) => (
-              <AuthenticatedImage key={photo.id} contentPath={photo.contentPath} alt={`Return photo ${index + 1}`} className="photo-grid__item" />
-            ))}
-          </div>
-        )}
-      </section>
+        <div className="return-details-column">
+          <section className="return-details-section">
+            <h2 className="return-details-section__heading">
+              <DetailIcon name="photos" />
+              Photos ({detail.photos.length})
+            </h2>
+            {sortedPhotos.length === 0 ? (
+              <p className="return-details-section__empty">No photos yet.</p>
+            ) : (
+              <div className="photo-grid">
+                {sortedPhotos.map((photo, index) => (
+                  <AuthenticatedImage
+                    key={photo.id}
+                    contentPath={photo.contentPath}
+                    alt={`Return photo ${index + 1}`}
+                    className="photo-grid__item"
+                    onActivate={() => setPreviewPhotoIndex(index)}
+                    activateLabel={`View return photo ${index + 1}`}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
 
-      <section className="return-details-section">
-        <h2>Customer signature</h2>
-        {detail.signature ? (
-          <div className="signature-block">
-            <p>
-              Signed by {detail.signature.signerName} on {formatSydneyTimestamp(detail.signature.signedAt)} (Sydney time)
-            </p>
-            <AuthenticatedImage
-              contentPath={detail.signature.contentPath}
-              alt={`Customer signature from ${detail.signature.signerName}`}
-              className="signature-block__image"
-            />
-          </div>
-        ) : (
-          <p>Signature pending.</p>
-        )}
-      </section>
+          <section className="return-details-section">
+            <h2 className="return-details-section__heading">
+              <DetailIcon name="signature" />
+              Customer signature
+            </h2>
+            {detail.signature ? (
+              <div className="signature-block">
+                <p className="signature-block__meta">
+                  Signed by {detail.signature.signerName} on {formatSydneyTimestamp(detail.signature.signedAt)} (Sydney time)
+                </p>
+                <AuthenticatedImage
+                  contentPath={detail.signature.contentPath}
+                  alt={`Customer signature from ${detail.signature.signerName}`}
+                  className="signature-block__image"
+                />
+              </div>
+            ) : (
+              <p className="return-details-section__empty">Signature pending.</p>
+            )}
+          </section>
+        </div>
+      </div>
 
       <section className="return-details-section return-details-section--review">
-        <h2>Warehouse review</h2>
+        <h2 className="return-details-section__heading">
+          <Icon name="warehouse" className="return-details-section__icon" />
+          Warehouse review
+        </h2>
 
         {lifecycleMessage && (
           <div className="error-message" role="alert">
@@ -531,9 +638,13 @@ function ReturnDetailsContent({
 
         {detail.status === 'AWAITING_WAREHOUSE' && (
           <div className="review-actions">
-            <p>This return is waiting for warehouse review.</p>
+            <p className="review-banner review-banner--waiting">
+              <DetailIcon name="clock" className="review-banner__icon" />
+              This return is waiting for warehouse review.
+            </p>
             <div className="review-actions__buttons">
-              <button type="button" onClick={onStartReview} disabled={startReviewPending}>
+              <button type="button" className="review-actions__primary" onClick={onStartReview} disabled={startReviewPending}>
+                <DetailIcon name="play" className="review-actions__button-icon" />
                 Start Review
               </button>
               <button type="button" className="secondary-button" onClick={onOpenCancel}>
@@ -553,8 +664,8 @@ function ReturnDetailsContent({
             {isOwner ? (
               <>
                 <WarehouseReviewForm form={form} setForm={setForm} padRef={padRef} closeValidation={closeValidation} />
-                <div className="review-actions__buttons">
-                  <button type="button" onClick={onCloseClick} disabled={closePending}>
+                <div className="review-actions__buttons review-actions__buttons--owner">
+                  <button type="button" className="review-actions__primary" onClick={onCloseClick} disabled={closePending}>
                     Close Return
                   </button>
                   <button type="button" className="secondary-button" onClick={onOpenRelease}>
@@ -567,7 +678,7 @@ function ReturnDetailsContent({
               </>
             ) : (
               <div className="review-actions__buttons">
-                <button type="button" onClick={onOpenTakeover}>
+                <button type="button" className="review-actions__primary" onClick={onOpenTakeover}>
                   Take Over Review
                 </button>
                 <button type="button" className="secondary-button" onClick={onOpenCancel}>
@@ -589,6 +700,15 @@ function ReturnDetailsContent({
         )}
         {detail.status === 'CANCELLED' && <CancelledSummary detail={detail} />}
       </section>
+
+      {previewPhoto && previewPhotoIndex !== null && (
+        <ImagePreviewDialog
+          contentPath={previewPhoto.contentPath}
+          alt={`Return photo ${previewPhotoIndex + 1}`}
+          title={`Return photo ${previewPhotoIndex + 1}`}
+          onClose={() => setPreviewPhotoIndex(null)}
+        />
+      )}
     </div>
   );
 }
@@ -603,37 +723,42 @@ interface WarehouseReviewFormProps {
 function WarehouseReviewForm({ form, setForm, padRef, closeValidation }: WarehouseReviewFormProps) {
   return (
     <div className="review-form">
-      <YesNoField
-        name="sellable"
-        label="Sellable"
-        value={form.sellable}
-        onChange={(value) => setForm((prev) => ({ ...prev, sellable: value }))}
-      />
-      {closeValidation.sellable && <p className="field-error">{closeValidation.sellable}</p>}
+      {/* The four decisions stay `YesNoField` radio groups holding `null`
+          until the admin answers — Close validation still distinguishes an
+          untouched decision from an explicit No, so nothing is preselected. */}
+      <div className="review-form__decisions">
+        <YesNoField
+          name="sellable"
+          label="Sellable"
+          value={form.sellable}
+          onChange={(value) => setForm((prev) => ({ ...prev, sellable: value }))}
+        />
+        {closeValidation.sellable && <p className="field-error">{closeValidation.sellable}</p>}
 
-      <YesNoField
-        name="creditCustomer"
-        label="Credit customer"
-        value={form.creditCustomer}
-        onChange={(value) => setForm((prev) => ({ ...prev, creditCustomer: value }))}
-      />
-      {closeValidation.creditCustomer && <p className="field-error">{closeValidation.creditCustomer}</p>}
+        <YesNoField
+          name="creditCustomer"
+          label="Credit customer"
+          value={form.creditCustomer}
+          onChange={(value) => setForm((prev) => ({ ...prev, creditCustomer: value }))}
+        />
+        {closeValidation.creditCustomer && <p className="field-error">{closeValidation.creditCustomer}</p>}
 
-      <YesNoField
-        name="chargeCustomer"
-        label="Charge customer"
-        value={form.chargeCustomer}
-        onChange={(value) => setForm((prev) => ({ ...prev, chargeCustomer: value }))}
-      />
-      {closeValidation.chargeCustomer && <p className="field-error">{closeValidation.chargeCustomer}</p>}
+        <YesNoField
+          name="chargeCustomer"
+          label="Charge customer"
+          value={form.chargeCustomer}
+          onChange={(value) => setForm((prev) => ({ ...prev, chargeCustomer: value }))}
+        />
+        {closeValidation.chargeCustomer && <p className="field-error">{closeValidation.chargeCustomer}</p>}
 
-      <YesNoField
-        name="chargeDriver"
-        label="Charge driver"
-        value={form.chargeDriver}
-        onChange={(value) => setForm((prev) => ({ ...prev, chargeDriver: value }))}
-      />
-      {closeValidation.chargeDriver && <p className="field-error">{closeValidation.chargeDriver}</p>}
+        <YesNoField
+          name="chargeDriver"
+          label="Charge driver"
+          value={form.chargeDriver}
+          onChange={(value) => setForm((prev) => ({ ...prev, chargeDriver: value }))}
+        />
+        {closeValidation.chargeDriver && <p className="field-error">{closeValidation.chargeDriver}</p>}
+      </div>
 
       <div className="form-field">
         <label htmlFor="warehouse-observation">Warehouse observation (optional)</label>
@@ -642,16 +767,20 @@ function WarehouseReviewForm({ form, setForm, padRef, closeValidation }: Warehou
           value={form.warehouseObservation}
           onChange={(event) => setForm((prev) => ({ ...prev, warehouseObservation: event.target.value }))}
           rows={3}
+          placeholder="Enter observation…"
         />
       </div>
 
       <div className="form-field">
         <label htmlFor="warehouse-representative-name">Warehouse representative name</label>
+        {/* Still typed by the reviewing admin — deliberately not pre-filled
+            from the logged-in account; that stays a separate product decision. */}
         <input
           id="warehouse-representative-name"
           type="text"
           value={form.warehouseRepresentativeName}
           onChange={(event) => setForm((prev) => ({ ...prev, warehouseRepresentativeName: event.target.value }))}
+          placeholder="Enter name…"
         />
         {closeValidation.representativeName && <p className="field-error">{closeValidation.representativeName}</p>}
       </div>
@@ -668,6 +797,7 @@ function WarehouseReviewForm({ form, setForm, padRef, closeValidation }: Warehou
               setForm((prev) => ({ ...prev, strokes: prev.strokes.slice(0, -1) }));
             }}
           >
+            <DetailIcon name="undo" className="review-form__pad-icon" />
             Undo
           </button>
           <button
@@ -678,6 +808,7 @@ function WarehouseReviewForm({ form, setForm, padRef, closeValidation }: Warehou
               setForm((prev) => ({ ...prev, strokes: [] }));
             }}
           >
+            <DetailIcon name="trash" className="review-form__pad-icon" />
             Clear
           </button>
         </div>
@@ -689,7 +820,7 @@ function WarehouseReviewForm({ form, setForm, padRef, closeValidation }: Warehou
 
 function ClosedWarehouseSummary({ detail }: { detail: AdminReturnDetail }) {
   return (
-    <dl className="detail-list">
+    <dl className="detail-list detail-list--summary">
       {detail.reviewer && (
         <div>
           <dt>Reviewed by</dt>
@@ -756,7 +887,7 @@ function ClosedWarehouseSummary({ detail }: { detail: AdminReturnDetail }) {
 
 function CancelledSummary({ detail }: { detail: AdminReturnDetail }) {
   return (
-    <dl className="detail-list">
+    <dl className="detail-list detail-list--summary">
       <div>
         <dt>Cancellation reason</dt>
         <dd>{detail.cancellationReason}</dd>
