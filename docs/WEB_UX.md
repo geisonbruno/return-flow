@@ -208,7 +208,9 @@ No `DRAFT` status, partial-decision persistence, `localStorage` persistence, or 
 
 **Route management:**
 
-- List routes
+- List routes (tenant-scoped, one loaded administration array; no pagination or sorting)
+- Three read-only summary counts — Total routes, Active routes, Inactive routes — derived from that complete array, independent of the search field; no trends, navigation, or additional API
+- Client-side, case-insensitive search over the loaded routes by name or code
 - Create route (code + name)
 - Edit route
 - Activate/deactivate
@@ -243,7 +245,7 @@ No stack trace, filesystem path, storage key, token, database detail, or interna
 
 ## 11. Responsive behavior
 
-- **Desktop** (approved and implemented): persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows.
+- **Desktop** (approved and implemented): persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows. The compact top-level header is shared by `/dashboard`, `/returns`, `/users`, and `/routes`; nested pages keep the normal shell header.
 - **Tablet:** adaptation remains future work; no tablet layout is approved by the Dashboard redesign.
 - **Small browser viewport (phone-width browser):** adaptation remains future work; the driver-facing mobile app remains the approved phone workflow.
 
@@ -316,12 +318,12 @@ This checkpoint implements none of the above.
 
 ### Routes
 
-- **Header:** shell nav (Routes active)
-- **Primary content:** paginated route table
+- **Header:** shell nav (Routes active), compact page header (`Routes` / `Manage delivery routes`), Create route then the shell account control
+- **Primary content:** three summary cards, a name/code search field, then the Code/Name/Status/Actions route table
 - **Primary action:** Create route
-- **Secondary actions:** Edit, Activate/Deactivate
+- **Secondary actions:** Edit, Activate/Deactivate (through Edit)
 - **Loading:** skeleton rows
-- **Empty:** "No routes yet."
+- **Empty:** "No routes yet." — distinguished from a search that simply matches none of the loaded routes
 - **Failure:** inline error + retry
 
 ## 14. Open decisions
