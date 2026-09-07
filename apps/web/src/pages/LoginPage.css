@@ -1,0 +1,213 @@
+/*
+ * Login-only presentation. Login renders outside `AppShell`, so it cannot
+ * inherit the approved `--rf-*` palette declared on `.app-shell`; the same
+ * token values are re-declared here, page-scoped, rather than promoting them
+ * to `:root` — that would edit the frozen authenticated shell's CSS.
+ */
+.login-page {
+  --rf-page: #080e13;
+  --rf-surface: #0d141a;
+  --rf-surface-raised: #111a22;
+  --rf-border: #29343e;
+  --rf-border-soft: #1c2730;
+  --rf-text: #f3f5f7;
+  --rf-muted: #a4aeb8;
+  --rf-green: #47ce65;
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  box-sizing: border-box;
+  background: var(--rf-page);
+  color: var(--rf-text);
+  color-scheme: dark;
+}
+
+/* Purely decorative ambient corners — non-interactive, no image assets. */
+.login-page__ambient {
+  position: absolute;
+  z-index: -1;
+  width: 620px;
+  height: 620px;
+  border-radius: 50%;
+  border: 1px solid rgba(71, 206, 101, 0.09);
+  background: radial-gradient(circle at center, rgba(71, 206, 101, 0.07), transparent 62%);
+  pointer-events: none;
+}
+
+.login-page__ambient--top {
+  top: -330px;
+  left: -290px;
+}
+
+.login-page__ambient--bottom {
+  right: -300px;
+  bottom: -340px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 500px;
+  box-sizing: border-box;
+  padding: 56px 36px 48px;
+  border: 1px solid var(--rf-border);
+  border-radius: 10px;
+  background: var(--rf-surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.login-card__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.login-card__brand-mark {
+  width: 58px;
+  height: 58px;
+  display: block;
+  color: var(--rf-green);
+}
+
+.login-card__wordmark {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.login-card__heading {
+  margin: 0;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 500;
+  color: #d7dde2;
+}
+
+.login-page .form-field {
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.login-page .form-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rf-text);
+}
+
+.login-card__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-card__input-icon {
+  position: absolute;
+  left: 16px;
+  width: 19px;
+  height: 19px;
+  color: var(--rf-muted);
+  pointer-events: none;
+}
+
+.login-page .form-field input {
+  width: 100%;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px 0 47px;
+  border: 1px solid var(--rf-border);
+  border-radius: 7px;
+  background: var(--rf-surface-raised);
+  color: var(--rf-text);
+  font: inherit;
+  font-size: 15px;
+}
+
+/* Leaves room for the reveal control without altering the shared field metrics. */
+.login-page .form-field input.login-card__input--toggleable {
+  padding-right: 46px;
+}
+
+.login-card__reveal {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rf-muted);
+}
+
+.login-card__reveal:hover:not(:disabled) {
+  color: var(--rf-text);
+  background: #1a252e;
+}
+
+.login-card__reveal:disabled {
+  opacity: 0.5;
+}
+
+.login-card__reveal-icon {
+  width: 19px;
+  height: 19px;
+  display: block;
+}
+
+.login-page .form-field input::placeholder {
+  color: #7f8b96;
+  opacity: 1;
+}
+
+.login-page .form-field input:hover:not(:disabled) {
+  border-color: #44515d;
+}
+
+.login-page .form-field input:disabled {
+  opacity: 0.65;
+}
+
+.login-page button[type='submit'] {
+  height: 48px;
+  width: 100%;
+  margin-top: 11px;
+  border: 1px solid var(--rf-green);
+  border-radius: 7px;
+  background: var(--rf-green);
+  color: var(--rf-page);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.login-page button[type='submit']:hover:not(:disabled) {
+  background: #55d972;
+  border-color: #55d972;
+}
+
+/* Keeps the shared, light-themed `.error-message` legible on the dark card. */
+.login-page .error-message {
+  margin: 18px 0 0;
+  padding: 11px 14px;
+  border: 1px solid #6b2b2b;
+  border-radius: 7px;
+  background: #241516;
+  color: #f2b8b5;
+  font-size: 13px;
+}
+
+.login-page :is(input, button):focus-visible {
+  outline: 1px solid var(--rf-green);
+  outline-offset: 1px;
+}

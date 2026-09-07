@@ -71,7 +71,87 @@ describe('LoginPage', () => {
     const password = screen.getByLabelText('Password');
     expect(email).toHaveAttribute('type', 'email');
     expect(password).toHaveAttribute('type', 'password');
+    expect(email).toHaveAttribute('placeholder', 'Enter your email');
+    expect(password).toHaveAttribute('placeholder', 'Enter your password');
+    expect(email).toHaveAttribute('autocomplete', 'username');
+    expect(password).toHaveAttribute('autocomplete', 'current-password');
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('renders the ReturnFlow branding and the sign-in heading', () => {
+    renderLoginPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'ReturnFlow' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sign in to your account' })).toBeInTheDocument();
+  });
+
+  it('offers no secondary account actions beyond signing in and revealing the password', () => {
+    renderLoginPage();
+
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show password' })).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/remember/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/forgot|sign up|create account/i)).not.toBeInTheDocument();
+  });
+
+  it('hides the password by default and toggles visibility without changing the entered value', async () => {
+    renderLoginPage();
+
+    const password = screen.getByLabelText('Password');
+    fireEvent.change(password, { target: { value: 'password123' } });
+    expect(password).toHaveAttribute('type', 'password');
+    expect(screen.queryByRole('button', { name: 'Hide password' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Show password' }));
+    });
+    expect(password).toHaveAttribute('type', 'text');
+    expect(password).toHaveValue('password123');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
+    });
+    expect(password).toHaveAttribute('type', 'password');
+    expect(password).toHaveValue('password123');
+  });
+
+  it('never submits the login form when the visibility control is used', async () => {
+    renderLoginPage();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@warehouse.example' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+
+    const toggle = screen.getByRole('button', { name: 'Show password' });
+    expect(toggle).toHaveAttribute('type', 'button');
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('disables the visibility control while a login request is in flight', async () => {
+    let resolveLogin!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveLogin = resolve;
+        }),
+    );
+
+    renderLoginPage();
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@warehouse.example' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show password' })).toBeDisabled());
+
+    await act(async () => {
+      resolveLogin(jsonResponse(401, {}));
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Show password' })).not.toBeDisabled());
   });
 
   it('shows a validation message and makes no request when fields are empty', async () => {

@@ -245,7 +245,7 @@ No stack trace, filesystem path, storage key, token, database detail, or interna
 
 ## 11. Responsive behavior
 
-- **Desktop** (approved and implemented): persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows. The compact top-level header is shared by `/dashboard`, `/returns`, `/users`, and `/routes`; nested pages keep the normal shell header.
+- **Desktop** (approved and implemented): the unauthenticated Login card, plus the persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows. The compact top-level header is shared by `/dashboard`, `/returns`, `/users`, and `/routes`; nested pages keep the normal shell header.
 - **Tablet:** adaptation remains future work; no tablet layout is approved by the Dashboard redesign.
 - **Small browser viewport (phone-width browser):** adaptation remains future work; the driver-facing mobile app remains the approved phone workflow.
 
@@ -274,7 +274,19 @@ This checkpoint implements none of the above.
 - **Secondary actions:** none (no self-service password reset in V1 web UI — matches root `CLAUDE.md` §24's admin-triggered reset model)
 - **Loading:** button spinner, form disabled
 - **Empty:** n/a
-- **Failure:** one generic invalid-credentials message above the form
+- **Failure:** one generic invalid-credentials message inside the card
+
+#### Desktop visual pattern
+
+Login sits outside `AppShell` and keeps that separation, so it re-declares the approved `--rf-*` dark palette in its own page-scoped stylesheet rather than promoting those tokens to a global scope.
+
+One centered card on the dark page holds, in order: the existing ReturnFlow brand mark and wordmark, the `Sign in to your account` heading, the labeled Email and Password fields, the full-width green `Sign in` button, and then the session/error feedback region. Both fields carry a decorative leading glyph and a placeholder; neither the glyphs nor the two ambient green corner shapes behind the card are interactive, and none of them is an image asset or a new dependency.
+
+The Password field also carries a trailing reveal control — a `type="button"` toggle that switches the input between `password` and `text` without ever changing the entered value, labeled `Show password` / `Hide password` and disabled while a login request is in flight. It is presentation only: it never submits the form and changes no authentication behavior.
+
+Inputs and buttons inside the card share one focus-visible treatment — a green outline with a small offset — so keyboard focus stays legible against the dark surface.
+
+No remember-me, forgot-password, signup, social login, or tenant selector appears — beyond the reveal control, the card carries only the approved V1 authentication behavior.
 
 ### Dashboard
 
