@@ -7,6 +7,15 @@ interface AuthenticatedImageProps {
   contentPath: string;
   alt: string;
   className?: string;
+  /**
+   * When provided, a *successfully loaded* image becomes a real `<button>`
+   * that calls this — used to open a larger preview. The loading and failed
+   * states deliberately stay non-interactive, so a thumbnail never offers a
+   * preview of bytes it does not have.
+   */
+  onActivate?: () => void;
+  /** Accessible name for that button; falls back to `alt`. Ignored without `onActivate`. */
+  activateLabel?: string;
 }
 
 /**
@@ -26,7 +35,7 @@ interface AuthenticatedImageProps {
  * ID) so React remounts a fresh instance per distinct `contentPath` rather
  * than reusing one across unrelated media.
  */
-export function AuthenticatedImage({ contentPath, alt, className }: AuthenticatedImageProps) {
+export function AuthenticatedImage({ contentPath, alt, className, onActivate, activateLabel }: AuthenticatedImageProps) {
   const blobQuery = useMediaBlob(contentPath);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
@@ -64,5 +73,16 @@ export function AuthenticatedImage({ contentPath, alt, className }: Authenticate
     );
   }
 
-  return <img src={objectUrl} alt={alt} className={className ? `authenticated-image ${className}` : 'authenticated-image'} />;
+  const image = <img src={objectUrl} alt={alt} className={className ? `authenticated-image ${className}` : 'authenticated-image'} />;
+
+  if (!onActivate) {
+    return image;
+  }
+
+  // A native button, so Enter/Space activation and focus come for free.
+  return (
+    <button type="button" className="authenticated-image__trigger" onClick={onActivate} aria-label={activateLabel ?? alt}>
+      {image}
+    </button>
+  );
 }

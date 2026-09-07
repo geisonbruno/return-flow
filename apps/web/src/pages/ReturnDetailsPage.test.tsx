@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetApiClientForTests, setAccessToken } from '../api/apiClient';
@@ -58,6 +58,25 @@ const DETAIL = {
   updatedAt: '2026-08-06T02:15:00Z',
 };
 
+/** Reports the live router path, so a test can prove an action did not navigate away from Return Details. */
+function LocationProbe() {
+  return <span data-testid="current-path" hidden>{useLocation().pathname}</span>;
+}
+
+const PHOTO_DETAIL = {
+  ...DETAIL,
+  photos: [
+    {
+      id: 'ph1',
+      contentType: 'image/jpeg',
+      sizeBytes: 100,
+      position: 1,
+      contentPath: `/api/v1/admin/returns/${RETURN_ID}/photos/ph1/content`,
+      createdAt: DETAIL.createdAt,
+    },
+  ],
+};
+
 function renderReturnDetails(path: string = `/returns/${RETURN_ID}`, authValue: AuthContextValue = AUTH_VALUE) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
@@ -65,6 +84,7 @@ function renderReturnDetails(path: string = `/returns/${RETURN_ID}`, authValue: 
       <AuthContext.Provider value={authValue}>
         <MemoryRouter initialEntries={[path]}>
           <NavigationGuardProvider>
+            <LocationProbe />
             <Routes>
               <Route path="/returns/:returnId" element={<ReturnDetailsPage />} />
               <Route path="/returns" element={<div>Returns Page</div>} />
@@ -204,6 +224,58 @@ describe('ReturnDetailsPage', () => {
     expect(screen.getByText('Dana Driver')).toBeInTheDocument();
     expect(screen.getByText('R1 — North Loop')).toBeInTheDocument();
     expect(screen.getByText(/6 Aug 2026/)).toBeInTheDocument();
+  });
+
+  it('lays the desktop page out as the approved information cards plus one warehouse review card', async () => {
+    stubFetch(() => jsonResponse(200, DETAIL));
+    renderReturnDetails();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'RF-000042' })).toBeInTheDocument());
+    for (const heading of ['Return information', 'Driver and route', 'Photos (0)', 'Customer signature', 'Warehouse review']) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+    }
+    // Refresh stays a Return Details page action, not a shell control.
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+
+  it('puts Back to Returns, the return number, the real status and Refresh in one compact header row', async () => {
+    stubFetch(() => jsonResponse(200, DETAIL));
+    const { container } = renderReturnDetails();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'RF-000042' })).toBeInTheDocument());
+
+    // The shared compact band the approved top-level pages already use.
+    const header = container.querySelector('.compact-page-header') as HTMLElement;
+    expect(header).toBeInTheDocument();
+    expect(within(header).getByRole('link', { name: '← Back to Returns' })).toBeInTheDocument();
+    expect(within(header).getByRole('heading', { name: 'RF-000042' })).toBeInTheDocument();
+    expect(within(header).getByText('Awaiting warehouse')).toBeInTheDocument();
+    expect(within(header).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+
+    // No second Return Details title/action row underneath it.
+    expect(container.querySelectorAll('.compact-page-header')).toHaveLength(1);
+    expect(container.querySelector('.page-header')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
+  });
+
+  it('shows the real status in the header rather than a hardcoded one', async () => {
+    stubFetch(() =>
+      jsonResponse(200, { ...DETAIL, status: 'IN_REVIEW', reviewer: { id: ME_ID, fullName: 'Ada Admin' }, reviewStartedAt: '2026-08-06T04:00:00Z' }),
+    );
+    renderReturnDetails();
+
+    await waitFor(() => expect(screen.getByText('In review')).toBeInTheDocument());
+    expect(screen.queryByText('Awaiting warehouse')).not.toBeInTheDocument();
+  });
+
+  it('shows no photo lightbox, zoom, or expand control — only the real photos', async () => {
+    stubFetch(() => jsonResponse(200, PHOTO_DETAIL));
+    renderReturnDetails();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Photos (1)' })).toBeInTheDocument());
+    const photos = screen.getByRole('heading', { name: 'Photos (1)' }).closest('section') as HTMLElement;
+    expect(within(photos).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(photos).queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('sets the document title to the return number after loading, and a generic title while loading', async () => {
@@ -358,6 +430,95 @@ describe('ReturnDetailsPage', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
+  it('makes a loaded photo thumbnail an accessible control that opens a large preview of that photo', async () => {
+    stubFetch(() => jsonResponse(200, PHOTO_DETAIL));
+    renderReturnDetails();
+
+    const thumbnail = await screen.findByRole('button', { name: 'View return photo 1' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(thumbnail);
+    });
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleName('Return photo 1');
+    // The preview shows the image itself, still through AuthenticatedImage.
+    expect(await within(dialog).findByRole('img', { name: 'Return photo 1' })).toBeInTheDocument();
+  });
+
+  it('never turns a still-loading or failed photo into a preview control', async () => {
+    // A photo whose content request fails: the card shows the inline retry,
+    // and offers no preview for bytes it does not have.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(typeof input === 'string' ? input : (input as Request).url, 'http://localhost');
+        if (url.pathname.includes('/photos/')) return new Response('nope', { status: 500 });
+        return jsonResponse(200, PHOTO_DETAIL);
+      }),
+    );
+    renderReturnDetails();
+
+    expect(await screen.findByText('Unable to load this image.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /View return photo/ })).not.toBeInTheDocument();
+  });
+
+  it('closes the preview from the Close control and from Escape', async () => {
+    stubFetch(() => jsonResponse(200, PHOTO_DETAIL));
+    renderReturnDetails();
+
+    const openPreview = async () => {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'View return photo 1' }));
+      });
+      return screen.getByRole('dialog');
+    };
+
+    await screen.findByRole('button', { name: 'View return photo 1' });
+    await openPreview();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Close photo preview' }));
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await openPreview();
+    await act(async () => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('opens the photo the admin actually clicked, in the returns own photo order', async () => {
+    stubFetch(() =>
+      jsonResponse(200, {
+        ...DETAIL,
+        photos: [
+          { id: 'ph2', contentType: 'image/jpeg', sizeBytes: 100, position: 2, contentPath: `/api/v1/admin/returns/${RETURN_ID}/photos/ph2/content`, createdAt: DETAIL.createdAt },
+          { id: 'ph1', contentType: 'image/jpeg', sizeBytes: 100, position: 1, contentPath: `/api/v1/admin/returns/${RETURN_ID}/photos/ph1/content`, createdAt: DETAIL.createdAt },
+        ],
+      }),
+    );
+    renderReturnDetails();
+
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /View return photo/ })).toHaveLength(2));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'View return photo 2' }));
+    });
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Return photo 2');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Close photo preview' }));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'View return photo 1' }));
+    });
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Return photo 1');
+  });
+
   it('resolves a photo contentPath to a single, non-duplicated /api/v1 request', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const rawUrl = typeof input === 'string' ? input : (input as Request).url;
@@ -477,6 +638,48 @@ describe('ReturnDetailsPage', () => {
       });
 
       await waitFor(() => expect(screen.getByText(/In review by you/)).toBeInTheDocument());
+    });
+
+    it('Start Review expands the same Return Details page — it never navigates to a separate review screen', async () => {
+      let currentDetail: unknown = DETAIL;
+      stubLifecycleFetch(() => currentDetail, {
+        startReview: () => {
+          currentDetail = { ...DETAIL, status: 'IN_REVIEW', reviewer: { id: ME_ID, fullName: 'Ada Admin' }, reviewStartedAt: '2026-08-06T04:00:00Z' };
+          return jsonResponse(200, currentDetail);
+        },
+      });
+      renderReturnDetails();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Start Review' })).toBeInTheDocument());
+
+      await act(async () => {
+        screen.getByRole('button', { name: 'Start Review' }).click();
+      });
+      await waitFor(() => expect(screen.getByText(/In review by you/)).toBeInTheDocument());
+
+      // Same route, and every information card above the review is still on screen.
+      expect(screen.getByTestId('current-path')).toHaveTextContent(`/returns/${RETURN_ID}`);
+      expect(screen.queryByText('Returns Page')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'RF-000042' })).toBeInTheDocument();
+      for (const heading of ['Return information', 'Driver and route', 'Photos (0)', 'Customer signature', 'Warehouse review']) {
+        expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+      }
+      expect(screen.getByText('Acme Pty Ltd')).toBeInTheDocument();
+      expect(screen.getByText('Dana Driver')).toBeInTheDocument();
+    });
+
+    it('opens the review form with all four decisions unanswered, never preselecting Yes', async () => {
+      const detail = { ...DETAIL, status: 'IN_REVIEW', reviewer: { id: ME_ID, fullName: 'Ada Admin' }, reviewStartedAt: '2026-08-06T04:00:00Z' };
+      stubLifecycleFetch(() => detail);
+      renderReturnDetails();
+
+      await waitFor(() => expect(screen.getByText(/In review by you/)).toBeInTheDocument());
+      for (const decision of ['Sellable', 'Credit customer', 'Charge customer', 'Charge driver']) {
+        const group = screen.getByRole('group', { name: decision });
+        expect(within(group).getByRole('radio', { name: 'Yes' })).not.toBeChecked();
+        expect(within(group).getByRole('radio', { name: 'No' })).not.toBeChecked();
+      }
+      expect(screen.getByLabelText('Warehouse representative name')).toHaveValue('');
+      expect(screen.getByLabelText('Warehouse observation (optional)')).toHaveValue('');
     });
 
     it('a Start Review conflict shows the actual current reviewer and refetches authoritative state', async () => {

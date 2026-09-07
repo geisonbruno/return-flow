@@ -1,11 +1,20 @@
 import { useState, type MouseEvent } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { NavigationGuardProvider, useNavigationGuard } from '../routes/navigationGuard';
 import { Icon, type IconName } from './Icon';
 
-/** The top-level pages that render their own compact header; a nested page (a return's details, say) keeps the normal shell header. */
+/** The top-level pages that render their own compact header. */
 const COMPACT_HEADER_PATHS = new Set(['/dashboard', '/returns', '/users', '/routes']);
+
+/**
+ * The one nested page that also renders the compact header. Matched by route
+ * *pattern* rather than by raw pathname, so a path only qualifies when the
+ * router actually resolves it to that page — an unmatched path such as
+ * `/users/not-a-page`, or anything deeper than the pattern, still keeps the
+ * normal shell header.
+ */
+const RETURN_DETAILS_ROUTE_PATTERN = '/returns/:returnId';
 
 function navLinkClassName({ isActive }: { isActive: boolean }): string {
   return isActive ? 'app-shell__nav-link app-shell__nav-link--active' : 'app-shell__nav-link';
@@ -29,7 +38,8 @@ export function AppShell() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const hasCompactHeader = COMPACT_HEADER_PATHS.has(location.pathname);
+  const returnDetailsMatch = useMatch(RETURN_DETAILS_ROUTE_PATTERN);
+  const hasCompactHeader = COMPACT_HEADER_PATHS.has(location.pathname) || returnDetailsMatch !== null;
   const handleLogout = async () => {
     setLoggingOut(true);
     try { await logout(); } finally { setLoggingOut(false); }

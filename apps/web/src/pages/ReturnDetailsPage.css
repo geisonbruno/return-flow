@@ -1,0 +1,692 @@
+/*
+ * Return-Details-only presentation. This page is nested under `/returns`, so
+ * it keeps the normal `AppShell` header and simply renders inside
+ * `.app-shell__content` — the approved `--rf-*` palette is already in scope
+ * there, so nothing is re-declared and no shell rule is touched. Shared
+ * primitives (`.page-header`, `.secondary-button`, `.field-error`,
+ * `.confirm-dialog`, `.authenticated-image`, `.yes-no-field`,
+ * `.warehouse-signature-pad`) keep their own contracts in `App.css` and are
+ * only re-skinned here, page-scoped.
+ */
+.return-details-page {
+  /* The same content maximum every other authenticated page uses, inside the
+     shell's own 28px gutters — so this page's title row, information grid and
+     warehouse review card all share one set of left/right boundaries, and the
+     row lines up beneath the shell's hamburger and account control. */
+  max-width: var(--dashboard-content-max-width);
+  margin-inline: auto;
+  color: var(--rf-text);
+  font-size: 13px;
+}
+
+/* ---------- Page header ---------- */
+
+/* Inherits the approved `.compact-page-header` band (height, right reserve
+   for the overlaid account control, and the gap down to the content). Only
+   the left inset is added, reserving the shell hamburger's own column so the
+   back link, return number and status badge read as one row beginning after
+   it — the shell itself is untouched. */
+.return-details-page .return-details-page__header {
+  padding-left: 44px;
+}
+
+.return-details-page .return-details-page__heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.return-details-page .return-details-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--rf-green);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.return-details-page .return-details-page__back:hover {
+  text-decoration: underline;
+}
+
+.return-details-page .return-details-page__title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.return-details-page .return-details-page__title h1 {
+  margin: 0;
+}
+
+.return-details-page .return-details-page__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 39px;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.return-details-page .return-details-page__refresh svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  color: var(--rf-green);
+}
+
+/* ---------- Desktop card layout ---------- */
+
+.return-details-page .return-details-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Two information columns; the warehouse review card below sits outside this
+   grid so it always spans the full page width, in every lifecycle state. */
+.return-details-page .return-details-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.return-details-page .return-details-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 16px;
+}
+
+.return-details-page .return-details-section {
+  /* Each card is content-height: the two columns are independent vertical
+     stacks, so a short card (Driver and route) never stretches to match a
+     tall one beside it. */
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--rf-border);
+  border-radius: 8px;
+  background: var(--rf-surface);
+}
+
+.return-details-page .return-details-section__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 17px;
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.return-details-page .return-details-section__icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  color: var(--rf-green);
+}
+
+.return-details-page .return-details-section__empty {
+  margin: 0;
+  color: var(--rf-muted);
+  font-size: 13px;
+}
+
+/* ---------- Label / value lists ---------- */
+
+.return-details-page .detail-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.return-details-page .detail-list > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 20px;
+}
+
+.return-details-page .detail-list--summary > div {
+  grid-template-columns: 192px minmax(0, 1fr);
+}
+
+.return-details-page .detail-list dt {
+  color: var(--rf-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.return-details-page .detail-list__preserve-lines {
+  white-space: pre-wrap;
+}
+
+.return-details-page .detail-list dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Photos and signatures (authenticated media) ---------- */
+
+.return-details-page .photo-grid {
+  /* Fixed-size thumbnails packed from the left: the card stays proportional
+     to how many photos there actually are, rather than inflating one photo to
+     fill a wide column. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 128px);
+  justify-content: start;
+  gap: 10px;
+}
+
+.return-details-page .authenticated-image {
+  border-radius: 7px;
+  border-color: var(--rf-border);
+  background: var(--rf-surface-raised);
+  color: var(--rf-muted);
+  font-size: 12px;
+}
+
+.return-details-page .authenticated-image--error {
+  border-color: #6c3434;
+  background: #2a1517;
+  color: #ff9b9b;
+}
+
+.return-details-page .authenticated-image--error button {
+  min-height: 30px;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.return-details-page .signature-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.return-details-page .signature-block__meta {
+  margin: 0;
+  color: var(--rf-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Bounded box, `contain` fit: the signature reads as one more piece of the
+   information hierarchy instead of dominating the page, and is never cropped
+   or stretched out of proportion. */
+.return-details-page .signature-block__image {
+  width: 100%;
+  max-width: 300px;
+  height: 96px;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border-radius: 7px;
+  border-color: #cbd2d9;
+  background: #fff;
+  padding: 4px;
+}
+
+/* ---------- Warehouse review ---------- */
+
+/* Warehouse decisions keep their own full-width card on the same content
+   boundaries and the same padding as the information cards above — a
+   continuation of the page, not a separate oversized block. Its controls are
+   held to a working column width so they stay readable on a wide desktop. */
+.return-details-page .return-details-section--review {
+  padding-bottom: 22px;
+}
+
+.return-details-page .review-form,
+.return-details-page .review-actions__buttons,
+.return-details-page .review-actions__buttons--owner,
+.return-details-page .pdf-action__buttons,
+.return-details-page .detail-list--summary {
+  max-width: 700px;
+}
+
+.return-details-page .review-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 20px;
+  color: var(--rf-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.return-details-page .review-banner__icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
+.return-details-page .review-actions p {
+    display: flex;
+    gap: 10px;
+}
+
+.return-details-page .review-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 0;
+}
+
+/* Close Return / Release Review / Cancel Return read as one deliberate row
+   at the form's own width, with Close as the primary action. */
+.return-details-page .review-actions__buttons--owner {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.return-details-page .review-actions__buttons--owner button {
+  min-height: 42px;
+}
+
+.return-details-page .review-actions__button-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+/* ---------- Review form ---------- */
+
+.return-details-page .review-form {
+  display: block;
+}
+
+/* The four decisions form one compact block rather than spreading across the
+   card, then a divider marks the transition to the written fields. */
+.return-details-page .review-form__decisions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--rf-border-soft);
+}
+
+/* `<fieldset>` participates in flex layout in every browser this desktop app
+   targets, which puts the legend and its two options on one compact row. If a
+   browser ever ignored it the legend simply stacks above the options — still
+   a correct, usable radio group. */
+.return-details-page .yes-no-field {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  gap: 0;
+}
+
+.return-details-page .yes-no-field legend {
+  flex: 0 0 146px;
+  width: 146px;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.return-details-page .yes-no-field__option {
+  flex: 0 0 78px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: #d7dde2;
+}
+
+.return-details-page .yes-no-field input[type='radio'] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--rf-green);
+}
+
+.return-details-page .review-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.return-details-page .review-form .form-field label,
+.return-details-page .review-form__signature-label {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rf-text);
+}
+
+.return-details-page .review-form textarea,
+.return-details-page .review-form input[type='text'] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  border: 1px solid var(--rf-border);
+  border-radius: 7px;
+  background: var(--rf-surface-raised);
+  color: var(--rf-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.return-details-page .review-form textarea {
+  min-height: 78px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.return-details-page .review-form input[type='text'] {
+  height: 44px;
+}
+
+.return-details-page ::placeholder {
+  color: #7f8b96;
+  opacity: 1;
+}
+
+.return-details-page .warehouse-signature-pad {
+  width: 100%;
+  max-width: none;
+  height: 132px;
+  border-radius: 7px;
+  border-color: #cbd2d9;
+}
+
+.return-details-page .review-form__pad-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.return-details-page .review-form__pad-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+}
+
+/* ---------- Buttons ---------- */
+
+.return-details-page button {
+  min-height: 38px;
+  padding: 8px 16px;
+  border: 1px solid var(--rf-border);
+  border-radius: 6px;
+  background: var(--rf-surface-raised);
+  color: var(--rf-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.return-details-page button:hover:not(:disabled) {
+  border-color: var(--rf-muted);
+}
+
+.return-details-page .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-color: #2f6a3f;
+  background: transparent;
+  color: var(--rf-green);
+}
+
+.return-details-page .secondary-button:hover:not(:disabled) {
+  border-color: var(--rf-green);
+  background: var(--rf-green-dark);
+}
+
+.return-details-page .review-actions__primary,
+.return-details-page .confirm-dialog__actions button:last-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-color: var(--rf-green);
+  background: var(--rf-green);
+  color: var(--rf-page);
+}
+
+.return-details-page .review-actions__primary:hover:not(:disabled),
+.return-details-page .confirm-dialog__actions button:last-child:hover:not(:disabled) {
+  border-color: #55d972;
+  background: #55d972;
+}
+
+/* ---------- PDF action (CLOSED only) ---------- */
+
+.return-details-page .pdf-action {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rf-border-soft);
+}
+
+.return-details-page .pdf-action__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ---------- Feedback states ---------- */
+
+.return-details-page .return-details-page__notice,
+.return-details-page .loading-state {
+  margin: 0;
+  padding: 34px 20px;
+  border: 1px solid var(--rf-border);
+  border-radius: 8px;
+  background: var(--rf-surface);
+  color: var(--rf-muted);
+  text-align: center;
+}
+
+.return-details-page .error-state {
+  padding: 22px;
+  border: 1px solid #6c3434;
+  border-radius: 8px;
+  background: #2a1517;
+}
+
+.return-details-page .error-state p {
+  margin: 0 0 14px;
+  color: #ff9b9b;
+}
+
+.return-details-page .error-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 700px;
+  margin: 0 0 15px;
+  padding: 11px 14px;
+  border: 1px solid #6b2b2b;
+  border-radius: 7px;
+  background: #241516;
+  color: #f2b8b5;
+  font-size: 13px;
+}
+
+.return-details-page .error-message p {
+  margin: 0;
+}
+
+.return-details-page .error-message button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 12px;
+  border-color: #6b2b2b;
+  background: transparent;
+  color: #f2b8b5;
+  font-size: 12px;
+}
+
+.return-details-page .field-error {
+  margin: 7px 0 0;
+  color: #ff9b9b;
+  font-size: 12px;
+}
+
+/* ---------- Confirmation dialogs ---------- */
+
+.return-details-page .confirm-dialog {
+  color-scheme: dark;
+  border-color: var(--rf-border);
+  background: var(--rf-surface);
+  color: var(--rf-text);
+}
+
+.return-details-page .confirm-dialog h2 {
+  font-size: 16px;
+}
+
+.return-details-page .confirm-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 13px;
+  border: 1px solid var(--rf-border);
+  border-radius: 7px;
+  background: var(--rf-surface-raised);
+  color: var(--rf-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.return-details-page .confirm-dialog .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.return-details-page .confirm-dialog__summary {
+  color: var(--rf-muted);
+  font-size: 13px;
+}
+
+/* Desktop is the approved scope for this page. This only preserves the
+   narrow-width collapse the removed `App.css` rules already provided, so the
+   page degrades sanely rather than breaking; the real tablet/phone pass is
+   still deferred to the consolidated responsive work. */
+@media (max-width: 900px) {
+  .return-details-page .return-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .return-details-page .detail-list > div,
+  .return-details-page .detail-list--summary > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .return-details-page .review-actions__buttons--owner {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Photo thumbnail preview ---------- */
+
+/* Only a successfully loaded thumbnail becomes this button (see
+   `AuthenticatedImage`), so a loading or failed photo never offers a preview. */
+.return-details-page .authenticated-image__trigger {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  line-height: 0;
+}
+
+.return-details-page .authenticated-image__trigger:hover {
+  border-color: var(--rf-green);
+}
+
+.return-details-page .authenticated-image__trigger:hover .authenticated-image {
+  filter: brightness(1.08);
+}
+
+.return-details-page .image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: rgba(4, 8, 11, 0.82);
+}
+
+.return-details-page .image-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 90vw;
+  max-height: 85vh;
+  padding: 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--rf-border);
+  border-radius: 9px;
+  background: var(--rf-surface);
+}
+
+.return-details-page .image-preview__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.return-details-page .image-preview__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.return-details-page .image-preview__close {
+  min-height: 32px;
+  padding: 4px 11px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* `contain` inside a bounded box: the photo is shown large but never cropped,
+   stretched, or pushed past the viewport. */
+.return-details-page .image-preview__image {
+  width: auto;
+  max-width: calc(90vw - 30px);
+  max-height: calc(85vh - 76px);
+  aspect-ratio: auto;
+  object-fit: contain;
+  padding: 0;
+  border-radius: 6px;
+  border-color: var(--rf-border);
+  background: #0a1015;
+}
+
+/* The dialog's own loading/error box needs a real size of its own, since
+   without decoded bytes there is nothing to give it one. */
+.return-details-page .image-preview :is(.authenticated-image--loading, .authenticated-image--error) {
+  width: min(70vw, 520px);
+  height: min(50vh, 340px);
+  aspect-ratio: auto;
+}
+
+/* ---------- Focus ---------- */
+
+.return-details-page :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--rf-green);
+  outline-offset: 2px;
+}
