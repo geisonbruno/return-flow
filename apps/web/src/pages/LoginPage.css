@@ -211,3 +211,14 @@
   outline: 1px solid var(--rf-green);
   outline-offset: 1px;
 }
+
+/* ---------- Responsive adaptation (desktop above is unchanged) ---------- */
+
+/* Login is already fluid (`width: 100%` card under a `max-width`, and the
+   decorative corners are clipped by the page's own `overflow: hidden`), so
+   this is a compatibility pass only: reclaim the generous desktop padding so
+   the fields keep their full usable width on a phone. */
+@media (max-width: 480px) {
+  .login-page { padding: 24px 14px; }
+  .login-card { padding: 36px 20px 30px; }
+}

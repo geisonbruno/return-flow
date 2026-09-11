@@ -21,14 +21,10 @@
 
 /* ---------- Page header ---------- */
 
-/* Inherits the approved `.compact-page-header` band (height, right reserve
-   for the overlaid account control, and the gap down to the content). Only
-   the left inset is added, reserving the shell hamburger's own column so the
-   back link, return number and status badge read as one row beginning after
-   it — the shell itself is untouched. */
-.return-details-page .return-details-page__header {
-  padding-left: 44px;
-}
+/* Inherits the approved `.compact-page-header` band wholesale — height, the
+   right reserve for the overlaid account control, the shared
+   `--compact-header-inset` that keeps the back link clear of the shell
+   hamburger, and the gap down to the content. Nothing page-local is needed. */
 
 .return-details-page .return-details-page__heading {
   display: flex;
@@ -577,10 +573,14 @@
   font-size: 13px;
 }
 
-/* Desktop is the approved scope for this page. This only preserves the
-   narrow-width collapse the removed `App.css` rules already provided, so the
-   page degrades sanely rather than breaking; the real tablet/phone pass is
-   still deferred to the consolidated responsive work. */
+/* ---------- Responsive adaptation (desktop above is unchanged) ---------- */
+
+/* This page keeps one tier of its own, above the shared 768px switch: two
+   information columns stop fitting side by side well before the shell needs
+   its drawer, so they collapse to a single column here. The approved reading
+   order follows from the DOM itself — Return information, Driver and route,
+   then Photos, Customer signature — with the full-width Warehouse review card
+   last, so nothing is reordered. */
 @media (max-width: 900px) {
   .return-details-page .return-details-grid {
     grid-template-columns: 1fr;
@@ -689,4 +689,40 @@
 .return-details-page :is(button, a, input, select, textarea):focus-visible {
   outline: 2px solid var(--rf-green);
   outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  /* The shared rule puts the compact top bar back in normal flow and clears
+     the hamburger reserve for every compact page, this one included. */
+  .return-details-page .return-details-page__heading { gap: 12px; }
+  .return-details-page .return-details-page__title h1 { font-size: 22px; }
+
+  .return-details-page .return-details-section { padding: 16px 14px 18px; }
+
+  /* Touch-sized review controls; the decisions, their null initial state and
+     their validation are untouched. */
+  .return-details-page button { min-height: 44px; }
+  .return-details-page .yes-no-field { min-height: 44px; }
+  .return-details-page .yes-no-field__option { min-height: 44px; padding-right: 6px; }
+  .return-details-page .yes-no-field input[type='radio'] { width: 18px; height: 18px; }
+  .return-details-page .review-form__pad-actions { flex-wrap: wrap; }
+
+  /* The preview must fit the phone viewport: `90vw` plus the overlay's own
+     24px padding was wider than the screen. Still one contained image, same
+     backdrop, same Close and Escape. */
+  .return-details-page .image-preview-overlay { padding: 12px; }
+  .return-details-page .image-preview { max-width: 100%; max-height: 92vh; padding: 10px; gap: 10px; }
+  .return-details-page .image-preview__image { max-width: 100%; max-height: calc(92vh - 74px); }
+  .return-details-page .image-preview :is(.authenticated-image--loading, .authenticated-image--error) {
+    width: 100%;
+    height: min(45vh, 300px);
+  }
+}
+
+@media (max-width: 480px) {
+  /* Below this the legend and its two options no longer share a row
+     comfortably, so the question sits above its answers. */
+  .return-details-page .review-form__decisions { gap: 16px; }
+  .return-details-page .yes-no-field { flex-wrap: wrap; align-items: flex-start; }
+  .return-details-page .yes-no-field legend { width: 100%; }
 }

@@ -19,6 +19,24 @@ vi.mock('recharts', () => {
   }
 })
 
+// jsdom ships no `matchMedia`, and `AppShell` subscribes to one to decide
+// between the persistent sidebar and the mobile drawer. This default never
+// matches, so every existing test keeps rendering the desktop shell; the
+// responsive tests replace it with one that does.
+if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
+  window.matchMedia = (query: string) =>
+    ({
+      media: query,
+      matches: false,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList
+}
+
 // This project doesn't set `test.globals: true`, so Testing Library's
 // automatic per-test cleanup (which relies on detecting a global
 // `afterEach`) never registers on its own — without this, DOM from earlier

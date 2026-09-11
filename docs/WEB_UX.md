@@ -246,8 +246,23 @@ No stack trace, filesystem path, storage key, token, database detail, or interna
 ## 11. Responsive behavior
 
 - **Desktop** (approved and implemented): the unauthenticated Login card, plus the persistent/collapsible sidebar, compact header, full Dashboard composition, and the existing authenticated workflows. The compact header is shared by the top-level `/dashboard`, `/returns`, `/users`, and `/routes` and by the one nested Return Details page, which opts in by matching the `/returns/:returnId` route *pattern*; any other nested or unmatched path still keeps the normal shell header.
-- **Tablet:** adaptation remains future work; no tablet layout is approved by the Dashboard redesign.
-- **Small browser viewport (phone-width browser):** adaptation remains future work; the driver-facing mobile app remains the approved phone workflow.
+- **Tablet and phone-width browser** (approved and implemented): one consolidated adaptation of that same desktop interface — not a separate mobile product, and not a redesign. Desktop remains the source of truth: almost every rule sits inside a `max-width` media query, the one deliberate exception being the shared compact-header inset below, which corrects a hamburger/title overlap at desktop widths too.
+
+Three shared breakpoints carry it, chosen for what breaks rather than for device models:
+
+| Tier | What changes |
+|---|---|
+| `≤ 1100px` | Summary cards 4 → 2 columns, analytics 3 → 2; the sidebar stays persistent but *defaults* to the existing collapsed rail so the content column keeps its width. It is only a default — the hamburger still toggles and an explicit choice wins, so `aria-expanded` always matches what is on screen. |
+| `≤ 768px` | The shell switches to mobile navigation (below); the compact top bar returns to normal flow instead of overlaying the page header; multi-column content becomes one column; dialogs become viewport-bounded and scroll internally. |
+| `≤ 480px` | Phone polish: tighter gutters, single-column cards, stacked dialog actions, and the account control reduced to its avatar. |
+
+Return Details keeps one page-local tier at `900px`, where its two information columns stop fitting side by side.
+
+**Compact headers.** The compact top bar is absolutely positioned over the page header and starts at the same gutter as the content, so the page title needs a reserved column for the shell hamburger. That reserve is one shared shell variable, `--compact-header-inset` (the control's real 40px width plus a 16px gap), used by all five compact-header pages — Dashboard, Returns, Return Details, Users, Routes. No page reserves the space for itself, and the title never renders beneath the hamburger at any width. At drawer widths the top bar leaves the overlay and returns to normal flow as its own row, the reserve is cleared, and the page content spans the full viewport minus its gutter.
+
+**Mobile navigation.** Below `768px` the *same* sidebar becomes an overlay drawer above the content rather than a permanent column — there is no second navigation component and no duplicated route definitions. The one hamburger keeps its desktop collapse job and becomes the drawer toggle only at these widths, carrying `aria-expanded` and `aria-controls`; a backdrop click, Escape (which returns focus to the hamburger), and selecting any destination each close it; a closed drawer is removed from the tab order. NavigationGuard is unaffected, so a dirty Return Details review form is still confirmed before the drawer navigates.
+
+**Tables.** Returns, Dashboard Recent Returns, Users, and Routes keep their full desktop information model at every width: no column is hidden, no text is shrunk to fit, and none becomes a card list. Where the columns no longer fit, the table's own wrapper scrolls horizontally — deliberately, and locally, so the document itself never acquires horizontal overflow. A card representation is not part of this pass.
 
 No separate mobile web product is designed.
 
@@ -330,7 +345,7 @@ Below the header, two equal desktop columns: Return information and Driver and r
 
 A photo thumbnail that has **loaded successfully** is an accessible control ("View return photo N", keyboard included) that opens one large image in a dedicated dark-backdrop preview dialog, closed by its Close control, Escape, or a backdrop click. The preview loads through the same authenticated media path as the thumbnail, so the private `contentPath` is never used as a public image source. Loading and failed thumbnails stay non-interactive and keep their inline retry. There is no carousel, zoom, download, or new dependency.
 
-Desktop only: the consolidated responsive Web adaptation remains deferred.
+The consolidated responsive Web adaptation (§11) covers this page too: the two information columns collapse to one, the review form takes touch-sized controls, and the photo preview is bounded to the phone viewport — all without changing the review workflow.
 
 ### Users
 
