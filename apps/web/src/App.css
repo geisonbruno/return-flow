@@ -687,13 +687,9 @@ button.summary-card--clickable:hover { background: #121b22; border-color: #42505
 .dashboard-recent__heading a { color: var(--rf-green); font-size: 12px; text-decoration: none; }
 .dashboard-recent__heading a:hover { text-decoration: underline; }
 .dashboard-recent__table-wrap { border: 1px solid var(--rf-border-soft); border-radius: 6px; }
-/* Density (font size, row heights, padding, badge scale) matches the approved
-   Returns table in `ReturnsListPage.css`; only the Dashboard's own colours differ. */
-.dashboard-recent__table { font-size: 13px; line-height: 1.5; }
-.dashboard-recent__table th, .dashboard-recent__table td { box-sizing: border-box; border-bottom-color: var(--rf-border-soft); }
-.dashboard-recent__table th { height: 48px; padding: 12px 16px; background: #172028; color: #bbc4cc; border-bottom: 1px solid var(--rf-border); }
-.dashboard-recent__table td { height: 44px; padding: 7px 16px; }
-.dashboard-recent__table .status-badge { padding: 4px 9px; border-radius: 5px; font-size: 12px; font-weight: 600; }
+.dashboard-recent__table { font-size: 11px; }
+.dashboard-recent__table th, .dashboard-recent__table td { padding: 6px 9px; border-bottom-color: var(--rf-border-soft); }
+.dashboard-recent__table th { background: #172028; color: #bbc4cc; border-bottom: 1px solid var(--rf-border); }
 .dashboard-recent__table tbody tr:hover { background: #111a21; }
 .dashboard-recent__table a { color: #e4e9ed; text-decoration: none; }
 .dashboard-recent__table a:hover { color: var(--rf-green); text-decoration: underline; }
