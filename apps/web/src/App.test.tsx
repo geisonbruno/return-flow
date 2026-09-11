@@ -132,6 +132,26 @@ function stubAuthenticatedFetchWithReturn(options: { inReturnsList?: boolean; de
   );
 }
 
+/**
+ * Makes `AppShell`'s mobile-navigation media query match, so the shared
+ * sidebar renders as the overlay drawer. jsdom has no layout engine, so
+ * these tests assert the *behavior* the drawer adds (open/close, closing on
+ * navigation, Escape, no duplicated controls) - the geometry itself still
+ * needs manual browser review.
+ */
+function stubMobileViewport() {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    media: query,
+    matches: query.includes('max-width: 768px'),
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }));
+}
+
 describe('App routing', () => {
   beforeEach(() => {
     resetApiClientForTests();
@@ -372,5 +392,160 @@ describe('App routing', () => {
 
     await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  // The hamburger's reserved column is shared shell geometry, keyed entirely
+  // off this class pair -- a page that stopped using it would silently render
+  // its title underneath the shell hamburger. jsdom cannot measure that, but
+  // it can hold every compact page to the shared hook.
+  it.each([
+    ['/dashboard', 'Dashboard'],
+    ['/returns', 'Returns'],
+    ['/users', 'Users'],
+    ['/routes', 'Routes'],
+  ])('gives %s exactly one shared compact-header band carrying its title', async (path, title) => {
+    saveRefreshToken('stored-refresh-token');
+    window.history.pushState({}, '', path);
+    if (path === '/dashboard') stubAuthenticatedFetch();
+    else stubAuthenticatedFetchWithReturn();
+
+    render(<App />);
+    await screen.findByRole('heading', { name: title, level: 1 });
+
+    const bands = document.querySelectorAll('.dashboard-header, .compact-page-header');
+    expect(bands).toHaveLength(1);
+    expect(bands[0]).toContainElement(screen.getByRole('heading', { name: title, level: 1 }));
+    // The reserve is the shell's, not the page's: no page-local left inset.
+    expect((bands[0] as HTMLElement).style.paddingLeft).toBe('');
+    expect(screen.getAllByRole('button', { name: 'Collapse sidebar' })).toHaveLength(1);
+  });
+
+  it('gives Return Details the same shared compact-header band, with its back link inside it', async () => {
+    saveRefreshToken('stored-refresh-token');
+    window.history.pushState({}, '', `/returns/${RETURN_DETAIL.id}`);
+    stubAuthenticatedFetchWithReturn();
+
+    render(<App />);
+    await screen.findByRole('heading', { name: RETURN_DETAIL.returnNumber });
+
+    const bands = document.querySelectorAll('.dashboard-header, .compact-page-header');
+    expect(bands).toHaveLength(1);
+    expect(bands[0]).toContainElement(screen.getByRole('link', { name: '← Back to Returns' }));
+    expect(screen.getAllByRole('button', { name: 'Collapse sidebar' })).toHaveLength(1);
+  });
+
+  describe('mobile navigation', () => {
+    it('turns the one hamburger into a drawer toggle, and opens and closes the same sidebar navigation', async () => {
+      saveRefreshToken('stored-refresh-token');
+      window.history.pushState({}, '', '/dashboard');
+      stubAuthenticatedFetch();
+      stubMobileViewport();
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument());
+
+      // Still exactly one hamburger and one account control - the drawer
+      // reuses the shell's own sidebar rather than adding a second nav.
+      const toggle = await screen.findByRole('button', { name: 'Open navigation' });
+      expect(screen.getAllByRole('button', { name: /navigation$/ })).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).not.toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle).toHaveAttribute('aria-controls', 'app-shell-sidebar');
+      expect(screen.getAllByRole('navigation', { name: 'Primary' })).toHaveLength(1);
+      expect(screen.getAllByText('Ada Admin', { selector: '.account-menu summary span' })).toHaveLength(1);
+
+      await act(async () => { toggle.click(); });
+      const opened = screen.getByRole('button', { name: 'Close navigation' });
+      expect(opened).toHaveAttribute('aria-expanded', 'true');
+      expect(document.querySelector('.app-shell')).toHaveClass('app-shell--drawer-open');
+
+      await act(async () => { opened.click(); });
+      expect(screen.getByRole('button', { name: 'Open navigation' })).toHaveAttribute('aria-expanded', 'false');
+      expect(document.querySelector('.app-shell')).not.toHaveClass('app-shell--drawer-open');
+    });
+
+    it('closes the drawer when a navigation destination is selected', async () => {
+      saveRefreshToken('stored-refresh-token');
+      window.history.pushState({}, '', '/dashboard');
+      stubAuthenticatedFetchWithReturn();
+      stubMobileViewport();
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument());
+
+      const toggle = await screen.findByRole('button', { name: 'Open navigation' });
+      await act(async () => { toggle.click(); });
+      expect(document.querySelector('.app-shell')).toHaveClass('app-shell--drawer-open');
+
+      await act(async () => {
+        within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('link', { name: 'Returns' }).click();
+      });
+
+      await waitFor(() => expect(window.location.pathname).toBe('/returns'));
+      expect(document.querySelector('.app-shell')).not.toHaveClass('app-shell--drawer-open');
+    });
+
+    it('closes the drawer on Escape and returns focus to the hamburger', async () => {
+      saveRefreshToken('stored-refresh-token');
+      window.history.pushState({}, '', '/dashboard');
+      stubAuthenticatedFetch();
+      stubMobileViewport();
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument());
+
+      const toggle = await screen.findByRole('button', { name: 'Open navigation' });
+      await act(async () => { toggle.click(); });
+      expect(document.getElementById('app-shell-sidebar')).toHaveFocus();
+
+      await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }); });
+
+      expect(document.querySelector('.app-shell')).not.toHaveClass('app-shell--drawer-open');
+      expect(screen.getByRole('button', { name: 'Open navigation' })).toHaveFocus();
+    });
+
+    it('still guards an unsaved review form when navigating from the drawer, and keeps the drawer open until confirmed', async () => {
+      saveRefreshToken('stored-refresh-token');
+      window.history.pushState({}, '', `/returns/${RETURN_DETAIL.id}`);
+      stubAuthenticatedFetchWithReturn({ detail: RETURN_DETAIL_IN_REVIEW });
+      stubMobileViewport();
+
+      render(<App />);
+      await waitFor(() => expect(screen.getByLabelText('Warehouse representative name')).toBeInTheDocument());
+      fireEvent.change(screen.getByLabelText('Warehouse representative name'), { target: { value: 'Wes Warehouse' } });
+
+      const toggle = await screen.findByRole('button', { name: 'Open navigation' });
+      await act(async () => { toggle.click(); });
+      await act(async () => {
+        within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('link', { name: 'Returns' }).click();
+      });
+
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(window.location.pathname).toBe(`/returns/${RETURN_DETAIL.id}`);
+      expect(document.querySelector('.app-shell')).toHaveClass('app-shell--drawer-open');
+
+      await act(async () => {
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Leave' }).click();
+      });
+
+      await waitFor(() => expect(window.location.pathname).toBe('/returns'));
+      expect(document.querySelector('.app-shell')).not.toHaveClass('app-shell--drawer-open');
+    });
+
+    it('keeps the compact header contract on a nested page at drawer widths', async () => {
+      saveRefreshToken('stored-refresh-token');
+      window.history.pushState({}, '', `/returns/${RETURN_DETAIL.id}`);
+      stubAuthenticatedFetchWithReturn();
+      stubMobileViewport();
+
+      render(<App />);
+
+      const main = await screen.findByRole('main');
+      expect(main.parentElement).toHaveClass('app-shell__main--compact-header');
+      await screen.findByRole('heading', { name: RETURN_DETAIL.returnNumber });
+      expect(screen.getByRole('link', { name: '← Back to Returns' })).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Refresh' })).toHaveLength(1);
+      expect(screen.getByText('Awaiting warehouse')).toBeInTheDocument();
+    });
   });
 });

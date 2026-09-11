@@ -214,3 +214,39 @@
   outline: 2px solid var(--rf-green);
   outline-offset: 2px;
 }
+
+/* ---------- Responsive adaptation (desktop above is unchanged) ---------- */
+
+@media (max-width: 1100px) {
+  /* The eight-track desktop filter row stops fitting; equal auto-fit tracks
+     keep every control at a usable width without changing any of them. */
+  .returns-page .returns-filters {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+  }
+
+  .returns-page .returns-filters__search { grid-column: span 2; }
+}
+
+@media (max-width: 768px) {
+  /* The band wraps here, so a fixed height would clip the wrapped rows. */
+  .returns-page .returns-page__header { height: auto; }
+
+  .returns-page .returns-filters { grid-template-columns: minmax(0, 1fr); }
+  .returns-page .returns-filters__search { grid-column: auto; }
+  .returns-page .returns-filters button[type='submit'] { width: 100%; }
+
+  /* Comfortable tap targets at touch widths. */
+  .returns-page .returns-filters input,
+  .returns-page .returns-filters select { height: 44px; }
+  .returns-page button { min-height: 44px; }
+
+  /* The table keeps every column and its approved density: the wrapper is
+     the scroll container (cells are `white-space: nowrap`, so the table keeps
+     its natural minimum width), which confines the scrolling to the table
+     rather than letting the page overflow. */
+  .returns-page .return-table-wrapper { overflow-x: auto; }
+
+  .returns-page .pagination { gap: 12px; }
+  .returns-page .pagination button { min-height: 44px; }
+}

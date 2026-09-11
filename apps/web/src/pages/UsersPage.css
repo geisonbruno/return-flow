@@ -310,3 +310,29 @@
   outline: 2px solid var(--rf-green);
   outline-offset: 2px;
 }
+
+/* ---------- Responsive adaptation (desktop above is unchanged) ---------- */
+
+@media (max-width: 1100px) {
+  .users-page .users-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .users-page .users-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .users-page .users-page__header { height: auto; }
+  .users-page .users-summary { grid-template-columns: minmax(0, 1fr); }
+  .users-page .users-filters { grid-template-columns: minmax(0, 1fr); }
+
+  /* Every column, including Actions, is preserved; the wrapper scrolls. */
+  .users-page .return-table-wrapper { overflow-x: auto; }
+
+  .users-page button { min-height: 44px; }
+  .users-page .admin-row-actions button { min-height: 38px; }
+  .users-page .users-page__create { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  .users-page .users-summary__card { gap: 16px; padding: 14px 16px; }
+  .users-page .users-summary__icon { flex-basis: 48px; height: 48px; }
+  .users-page .users-summary__icon svg { width: 24px; height: 24px; }
+}

@@ -280,3 +280,28 @@
   outline: 2px solid var(--rf-green);
   outline-offset: 2px;
 }
+
+/* ---------- Responsive adaptation (desktop above is unchanged) ---------- */
+
+@media (max-width: 1100px) {
+  .routes-page .routes-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .routes-page .routes-page__header { height: auto; }
+  .routes-page .routes-summary { grid-template-columns: minmax(0, 1fr); }
+
+  /* Routes fits at more widths than Users/Returns, but the same deliberate
+     local scroll applies when Code/Name/Status/Actions no longer fit. */
+  .routes-page .return-table-wrapper { overflow-x: auto; }
+
+  .routes-page button { min-height: 44px; }
+  .routes-page .admin-row-actions button { min-height: 38px; }
+  .routes-page .routes-page__create { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  .routes-page .routes-summary__card { gap: 16px; padding: 14px 16px; }
+  .routes-page .routes-summary__icon { flex-basis: 48px; height: 48px; }
+  .routes-page .routes-summary__icon svg { width: 24px; height: 24px; }
+}
