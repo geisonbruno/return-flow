@@ -47,6 +47,9 @@ export const UNIT_OPTIONS: readonly { value: ReturnUnit; label: string }[] = [
 
 export const STATUS_LABELS: Record<ReturnStatus, string> = {
   AWAITING_WAREHOUSE: 'Awaiting warehouse',
+  IN_REVIEW: 'In review',
+  CLOSED: 'Closed',
+  CANCELLED: 'Cancelled',
 };
 
 /** e.g. "3 CTN", "12 EA" — the compact form used in list rows, not the long "Carton"/"Each" label. */

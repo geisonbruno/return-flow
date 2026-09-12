@@ -15,8 +15,16 @@ export type ReturnReason =
 /** Matches the backend's `returnrecord.ReturnUnit` — CTN (Carton) and EA (Each) only. */
 export type ReturnUnit = 'CTN' | 'EA';
 
-/** Only status that exists in V1 — see `returnrecord.ReturnStatus`. */
-export type ReturnStatus = 'AWAITING_WAREHOUSE';
+/**
+ * The complete V1 lifecycle, matching `returnrecord.ReturnStatus` on the
+ * backend and root `CLAUDE.md` §9: `AWAITING_WAREHOUSE` → `IN_REVIEW` →
+ * `CLOSED` or `CANCELLED`, with an ADMIN able to cancel directly from
+ * `AWAITING_WAREHOUSE`. The driver app only ever reads these; it creates
+ * returns in `AWAITING_WAREHOUSE` and performs no lifecycle transition
+ * itself, but the list and details screens must render every one of them
+ * because the warehouse moves a return on while the driver still sees it.
+ */
+export type ReturnStatus = 'AWAITING_WAREHOUSE' | 'IN_REVIEW' | 'CLOSED' | 'CANCELLED';
 
 /** Matches `returnrecord.dto.DriverSummaryResponse`. */
 export interface DriverSummary {

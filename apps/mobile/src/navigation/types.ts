@@ -13,6 +13,7 @@
 export type RootStackParamList = {
   Login: undefined;
   ReturnList: undefined;
+  Profile: undefined;
   CreateReturn: undefined;
   ReturnDetails: { returnId: string };
   AddReturnPhotos: { returnId: string; origin: 'created' | 'details' };
