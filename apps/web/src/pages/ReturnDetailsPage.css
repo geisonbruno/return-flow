@@ -21,10 +21,10 @@
 
 /* ---------- Page header ---------- */
 
-/* Inherits the approved `.compact-page-header` band wholesale — height, the
-   right reserve for the overlaid account control, the shared
-   `--compact-header-inset` that keeps the back link clear of the shell
-   hamburger, and the gap down to the content. Nothing page-local is needed. */
+/* Inherits the shared `.compact-page-header` band wholesale — its height, its
+   alignment with the page content grid, and the gap down to the content. The
+   shell top bar is its own row, so the back link simply starts where the cards
+   below it do. Nothing page-local is needed. */
 
 .return-details-page .return-details-page__heading {
   display: flex;

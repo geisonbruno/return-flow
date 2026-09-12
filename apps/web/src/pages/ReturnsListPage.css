@@ -6,13 +6,6 @@
   font-size: 13px;
 }
 
-.returns-page .returns-page__header {
-  height: 72px;
-  padding-block: 8px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--rf-border-soft);
-}
-
 .returns-page button {
   min-height: 39px;
   box-sizing: border-box;
@@ -229,8 +222,6 @@
 }
 
 @media (max-width: 768px) {
-  /* The band wraps here, so a fixed height would clip the wrapped rows. */
-  .returns-page .returns-page__header { height: auto; }
 
   .returns-page .returns-filters { grid-template-columns: minmax(0, 1fr); }
   .returns-page .returns-filters__search { grid-column: auto; }
