@@ -612,13 +612,15 @@ button.summary-card--clickable:hover {
    column, and the compact page content — title, subtitle, cards, filters and
    tables alike — begins where that column ends. One value, read by every
    compact-header page; none of them sets its own. */
-/* `--compact-header-action-gap` separates a page action from the account
-   control overlaid to its right on the same row. The reserve below is a fixed
-   allowance for that control, but the control's own width grows with the
-   signed-in name, so the leftover space between them shrinks as the name gets
-   longer -- long enough and the two read as one attached block. Adding the gap
-   to the reserve keeps a deliberate separation regardless of the name. */
-.app-shell__main { --app-content-gutter: 28px; --dashboard-content-max-width: 1500px; --compact-hamburger-column: 56px; --compact-header-action-gap: 12px; position: relative; min-width: 0; }
+/* The compact header keeps its page action clear of the account control that
+   the shell overlays to its right on the same row. Together these two values
+   are that clearance: an allowance for the control itself, plus the gap that
+   should read between the two. They pair up as one right-side action group, so
+   the same pair applies at every width where the bar overlays the header --
+   there is no separate desktop and intermediate figure to drift apart. The
+   allowance is fixed while the control's real width follows the signed-in
+   name, so a much longer name than the current one would narrow the gap. */
+.app-shell__main { --app-content-gutter: 28px; --dashboard-content-max-width: 1500px; --compact-hamburger-column: 56px; --compact-header-account-reserve: 132px; --compact-header-action-gap: 12px; position: relative; min-width: 0; }
 .app-shell__topbar { height: 68px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid transparent; }
 .app-shell__content { padding: 0 var(--app-content-gutter) 30px; }
 .icon-button { border: 1px solid transparent; background: transparent; color: var(--rf-text); padding: 8px; border-radius: 6px; }
@@ -639,7 +641,25 @@ button.summary-card--clickable:hover {
 /* The compact top bar overlays the page-header band, so the hamburger sits on
    the SAME row as the page title rather than above it, and the account control
    sits on that row too. */
-.app-shell__main--compact-header .app-shell__topbar { position: absolute; z-index: 10; inset: 0 0 auto; height: 72px; padding-right: max(var(--app-content-gutter), calc((100% - var(--dashboard-content-max-width)) / 2)); pointer-events: none; }
+/* The account control ends on the page content's own right boundary. The bar
+   spans the whole main column, so its right padding has to reproduce where the
+   centred page container actually ends: the gutter, plus half of whatever the
+   content box has left over once it grows past the max width. The box is the
+   asymmetric compact one -- a gutter on the right, a gutter plus the hamburger
+   column on the left -- so that inset has to be subtracted here too. The older
+   formula assumed a symmetric box and, once the box passed the max width, left
+   the control a gutter's width short of the content edge on wide screens. */
+.app-shell__main--compact-header .app-shell__topbar {
+  position: absolute;
+  z-index: 10;
+  inset: 0 0 auto;
+  height: 72px;
+  padding-right: calc(
+    var(--app-content-gutter) +
+    max(0px, (100% - 2 * var(--app-content-gutter) - var(--compact-hamburger-column) - var(--dashboard-content-max-width)) / 2)
+  );
+  pointer-events: none;
+}
 .app-shell__main--compact-header .app-shell__topbar button,
 .app-shell__main--compact-header .app-shell__topbar details { pointer-events: auto; }
 
@@ -658,7 +678,7 @@ button.summary-card--clickable:hover {
    the same line the cards, filters and tables below start on. The right
    reserve keeps the page action clear of the account control overlaid on this
    same row. */
-.dashboard-header, .compact-page-header { min-height: 72px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 10px; padding: 10px calc(158px + var(--compact-header-action-gap, 12px)) 8px 0; }
+.dashboard-header, .compact-page-header { min-height: 72px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 10px; padding: 10px calc(var(--compact-header-account-reserve, 132px) + var(--compact-header-action-gap, 12px)) 8px 0; }
 .dashboard-header h1, .compact-page-header h1 { margin: 0; font-size: 28px; line-height: 1.12; letter-spacing: -0.03em; }
 .dashboard-header p, .compact-page-header p { margin: 4px 0 0; color: var(--rf-muted); font-size: 13px; }
 .dashboard-refresh { display: inline-flex; align-items: center; gap: 8px; min-height: 39px; border: 1px solid var(--rf-border); background: transparent; color: var(--rf-text); border-radius: 7px; padding: 0 14px; }
@@ -780,9 +800,6 @@ button.summary-card--clickable:hover { background: #121b22; border-color: #42505
      below and left the main content stuck in a narrow first track.) */
   .app-shell__main { --app-content-gutter: 20px; }
   .app-shell__topbar { padding-inline: 20px; }
-
-  /* Same two-column relationship, just a narrower gutter and right reserve. */
-  .dashboard-header, .compact-page-header { padding-right: calc(132px + var(--compact-header-action-gap, 12px)); }
 
 }
 
