@@ -8,6 +8,7 @@ import AddReturnPhotosScreen from '../screens/AddReturnPhotosScreen';
 import CreateReturnScreen from '../screens/CreateReturnScreen';
 import CustomerSignatureScreen from '../screens/CustomerSignatureScreen';
 import LoginScreen from '../screens/LoginScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import ReturnDetailsScreen from '../screens/ReturnDetailsScreen';
 import ReturnListScreen from '../screens/ReturnListScreen';
 import type { RootStackParamList } from './types';
@@ -32,7 +33,11 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerTitleAlign: 'center' }}>
         {status === 'authenticated' ? (
           <>
-            <Stack.Screen name="ReturnList" component={ReturnListScreen} options={{ title: 'My Returns' }} />
+            {/* The redesigned dark screens draw their own title and bottom
+                navigation, so they opt out of the stack header rather than
+                showing two competing titles. Every other route keeps it. */}
+            <Stack.Screen name="ReturnList" component={ReturnListScreen} options={{ title: 'My Returns', headerShown: false }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile', headerShown: false }} />
             <Stack.Screen name="CreateReturn" component={CreateReturnScreen} options={{ title: 'New Return' }} />
             <Stack.Screen name="ReturnDetails" component={ReturnDetailsScreen} options={{ title: 'Return Details' }} />
             <Stack.Screen name="AddReturnPhotos" component={AddReturnPhotosScreen} options={{ title: 'Add Photos', headerBackVisible: false }} />

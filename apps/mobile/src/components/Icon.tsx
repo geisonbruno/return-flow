@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-export type IconName = 'brand' | 'mail' | 'lock' | 'eye' | 'eye-off';
+export type IconName = 'brand' | 'mail' | 'lock' | 'eye' | 'eye-off' | 'returns' | 'plus' | 'plus-circle' | 'user' | 'chevron-right';
 
 /**
  * The mobile app's own line-icon set, drawn with the `react-native-svg` that
@@ -48,6 +48,27 @@ export function Icon({ name, size = 24, color = 'currentColor' }: { name: IconNa
         <Circle cx={12} cy={12} r={3} {...stroke} />
       </>
     ),
+    returns: (
+      <>
+        <Path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z" {...stroke} />
+        <Path d="m4 7.5 8 4.5 8-4.5M12 12v9" {...stroke} />
+        <Path d="m8 5.2 8 4.5" {...stroke} />
+      </>
+    ),
+    plus: <Path d="M12 5v14M5 12h14" {...stroke} />,
+    'plus-circle': (
+      <>
+        <Circle cx={12} cy={12} r={9} {...stroke} />
+        <Path d="M12 8.5v7M8.5 12h7" {...stroke} />
+      </>
+    ),
+    user: (
+      <>
+        <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" {...stroke} />
+        <Circle cx={12} cy={7} r={4} {...stroke} />
+      </>
+    ),
+    'chevron-right': <Path d="m9 6 6 6-6 6" {...stroke} />,
     'eye-off': (
       <>
         <Path

@@ -15,25 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { toSafeErrorMessage } from '../api/problemDetails';
 import { DRIVER_ONLY_MESSAGE, useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icon';
-
-/**
- * The approved ReturnFlow dark palette, declared here rather than app-wide.
- * Login is the only redesigned screen so far, exactly as the Web app did it
- * (`LoginPage.css` re-declares the same tokens page-locally instead of
- * promoting them to a global scope), so the other driver screens keep their
- * current appearance untouched until they are redesigned in their own task.
- */
-const palette = {
-  page: '#080E13',
-  surface: '#0D141A',
-  surfaceRaised: '#111A22',
-  border: '#29343E',
-  text: '#F3F5F7',
-  muted: '#A4AEB8',
-  green: '#47CE65',
-  ambient: 'rgba(71, 206, 101, 0.06)',
-  ambientEdge: 'rgba(71, 206, 101, 0.10)',
-};
+import { colors as palette } from '../theme/tokens';
 
 export default function LoginScreen() {
   const { login, sessionMessage } = useAuth();
@@ -254,10 +236,10 @@ const styles = StyleSheet.create({
   sessionMessage: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#F1BF31',
-    backgroundColor: '#2B230D',
+    color: palette.warning,
+    backgroundColor: palette.warningSurface,
     borderWidth: 1,
-    borderColor: '#8B670B',
+    borderColor: palette.warningBorder,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -305,10 +287,10 @@ const styles = StyleSheet.create({
   error: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#FF9B9B',
-    backgroundColor: '#2A1517',
+    color: palette.danger,
+    backgroundColor: palette.dangerSurface,
     borderWidth: 1,
-    borderColor: '#6C3434',
+    borderColor: palette.dangerBorder,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
