@@ -12,6 +12,15 @@ jest.mock('../auth/AuthContext', () => {
 const mockedUseAuth = useAuth as jest.Mock;
 
 describe('LoginScreen', () => {
+  // The first render in this file pays a one-time cost to initialise
+  // `react-native-svg`, which draws the brand mark and the field icons. On a
+  // cold jest cache that alone exceeded the 5s default timeout, so it is paid
+  // here rather than inside whichever test happens to run first.
+  beforeAll(() => {
+    mockedUseAuth.mockReturnValue({ login: jest.fn(), sessionMessage: null });
+    render(<LoginScreen />).unmount();
+  }, 60000);
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -60,5 +69,58 @@ describe('LoginScreen', () => {
     render(<LoginScreen />);
 
     expect(screen.getByText('This app is available to drivers only.')).toBeTruthy();
+  });
+
+  it('renders the redesigned driver sign-in copy and brand wordmark', () => {
+    mockedUseAuth.mockReturnValue({ login: jest.fn(), sessionMessage: null });
+
+    render(<LoginScreen />);
+
+    expect(screen.getByText('ReturnFlow')).toBeTruthy();
+    expect(screen.getByText('Driver sign in')).toBeTruthy();
+    expect(screen.getByText('Sign in to your account to manage returns on the go.')).toBeTruthy();
+  });
+
+  it('hides the password by default and offers a Show password control', () => {
+    mockedUseAuth.mockReturnValue({ login: jest.fn(), sessionMessage: null });
+
+    render(<LoginScreen />);
+
+    expect(screen.getByTestId('login-password-input').props.secureTextEntry).toBe(true);
+    expect(screen.getByLabelText('Show password')).toBeTruthy();
+    expect(screen.queryByLabelText('Hide password')).toBeNull();
+  });
+
+  it('reveals and re-hides the password, preserving the typed value and never submitting', () => {
+    const login = jest.fn();
+    mockedUseAuth.mockReturnValue({ login, sessionMessage: null });
+
+    render(<LoginScreen />);
+    fireEvent.changeText(screen.getByTestId('login-password-input'), 'password123');
+
+    fireEvent.press(screen.getByLabelText('Show password'));
+    expect(screen.getByTestId('login-password-input').props.secureTextEntry).toBe(false);
+    expect(screen.getByTestId('login-password-input').props.value).toBe('password123');
+    expect(screen.getByLabelText('Hide password')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Hide password'));
+    expect(screen.getByTestId('login-password-input').props.secureTextEntry).toBe(true);
+    expect(screen.getByTestId('login-password-input').props.value).toBe('password123');
+
+    // The reveal control is not a submit control.
+    expect(login).not.toHaveBeenCalled();
+  });
+
+  it('submits exactly the credentials that were typed, including a revealed password', async () => {
+    const login = jest.fn().mockResolvedValue(undefined);
+    mockedUseAuth.mockReturnValue({ login, sessionMessage: null });
+
+    render(<LoginScreen />);
+    fireEvent.changeText(screen.getByTestId('login-email-input'), 'driver@example.com');
+    fireEvent.changeText(screen.getByTestId('login-password-input'), 'password123');
+    fireEvent.press(screen.getByLabelText('Show password'));
+    fireEvent.press(screen.getByTestId('login-submit-button'));
+
+    await waitFor(() => expect(login).toHaveBeenCalledWith('driver@example.com', 'password123'));
   });
 });
