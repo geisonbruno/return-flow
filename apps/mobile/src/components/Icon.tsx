@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-export type IconName = 'brand' | 'mail' | 'lock' | 'eye' | 'eye-off' | 'returns' | 'plus' | 'plus-circle' | 'user' | 'chevron-right' | 'chevron-left' | 'camera' | 'image';
+export type IconName = 'brand' | 'mail' | 'lock' | 'eye' | 'eye-off' | 'returns' | 'plus' | 'plus-circle' | 'user' | 'chevron-right' | 'chevron-left' | 'camera' | 'image' | 'undo' | 'trash';
 
 /**
  * The mobile app's own line-icon set, drawn with the `react-native-svg` that
@@ -74,6 +74,20 @@ export function Icon({ name, size = 24, color = 'currentColor' }: { name: IconNa
       <>
         <Path d="M3 8.5a2 2 0 0 1 2-2h2.2l1.3-2h6l1.3 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" {...stroke} />
         <Circle cx={12} cy={13} r={3.5} {...stroke} />
+      </>
+    ),
+    undo: (
+      <>
+        <Path d="M9 14 4 9l5-5" {...stroke} />
+        <Path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H9" {...stroke} />
+      </>
+    ),
+    trash: (
+      <>
+        <Path d="M4 7h16" {...stroke} />
+        <Path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" {...stroke} />
+        <Path d="m6 7 1 12.2A2 2 0 0 0 9 21h6a2 2 0 0 0 2-1.8L18 7" {...stroke} />
+        <Path d="M10 11v6M14 11v6" {...stroke} />
       </>
     ),
     image: (

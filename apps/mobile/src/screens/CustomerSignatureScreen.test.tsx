@@ -54,12 +54,25 @@ const RECORD = {
 
 function buildProps(returnId = 'return-1') {
   return {
-    navigation: { replace: jest.fn(), navigate: jest.fn() },
+    navigation: { replace: jest.fn(), navigate: jest.fn(), goBack: jest.fn() },
     route: { params: { returnId } },
   };
 }
 
 describe('CustomerSignatureScreen', () => {
+  // The first render in this file pays a one-time cost to initialise the
+  // module tree (the signature pad's SVG layer and the step indicator among
+  // them). On a cold jest cache — the condition CI starts in — that alone
+  // outlasted the default waitFor window, so it is paid here rather than
+  // inside whichever test happens to run first.
+  beforeAll(async () => {
+    (getReturn as jest.Mock).mockResolvedValue(RECORD);
+    const view = render(<CustomerSignatureScreen {...(buildProps() as any)} />);
+    // The generous window is the point: this is the cold-start cost itself.
+    await waitFor(() => expect(screen.getByTestId('signer-name-input')).toBeTruthy(), { timeout: 30000 });
+    view.unmount();
+  }, 60000);
+
   beforeEach(() => {
     jest.clearAllMocks();
     (getReturn as jest.Mock).mockResolvedValue(RECORD);
@@ -183,5 +196,81 @@ describe('CustomerSignatureScreen', () => {
     render(<CustomerSignatureScreen {...(buildProps() as any)} />);
 
     await waitFor(() => expect(screen.getByText('Unable to load this return.')).toBeTruthy());
+  });
+
+  it('frames the screen as step 3, with Details and Photos already completed', async () => {
+    render(<CustomerSignatureScreen {...(buildProps() as any)} />);
+    await waitFor(() => expect(screen.getByTestId('signer-name-input')).toBeTruthy());
+
+    expect(screen.getByRole('header', { name: 'Customer Signature' })).toBeTruthy();
+    expect(screen.getByTestId('step-indicator')).toBeTruthy();
+    for (const label of ['Details', 'Photos', 'Signature', 'Review']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+
+    expect(screen.getByLabelText('Step 1 of 4, Details, completed')).toBeTruthy();
+    expect(screen.getByLabelText('Step 2 of 4, Photos, completed')).toBeTruthy();
+    expect(screen.getByLabelText('Step 3 of 4, Signature, current')).toBeTruthy();
+    expect(screen.getByLabelText('Step 4 of 4, Review, upcoming')).toBeTruthy();
+
+    expect(screen.getByTestId('step-3').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('step-2').props.accessibilityState.selected).toBe(false);
+  });
+
+  it('builds the summary from the loaded return, never from fixed sample values', async () => {
+    (getReturn as jest.Mock).mockResolvedValue({
+      ...RECORD,
+      returnNumber: 'RF-000777',
+      customerName: 'Corner Store',
+      productName: 'Milk 2L',
+      quantity: 1,
+      unit: 'EA' as const,
+      reason: 'MISSING_ITEM' as const,
+    });
+    render(<CustomerSignatureScreen {...(buildProps() as any)} />);
+
+    await waitFor(() => expect(screen.getByText('RF-000777')).toBeTruthy());
+    expect(screen.getByText('Corner Store')).toBeTruthy();
+    expect(screen.getByText('Milk 2L')).toBeTruthy();
+    // Canonical quantity + unit, and the reason label rather than the enum.
+    expect(screen.getByText('1 EA')).toBeTruthy();
+    expect(screen.getByText('Missing item')).toBeTruthy();
+    expect(screen.queryByText('MISSING_ITEM')).toBeNull();
+
+    // None of the screenshot's sample values leak into the screen.
+    for (const sample of ['RF-000012', 'Customer X', 'Milk blue 2l']) {
+      expect(screen.queryByText(sample)).toBeNull();
+    }
+  });
+
+  it('keeps Undo and Clear wired to the existing pad handle', async () => {
+    render(<CustomerSignatureScreen {...(buildProps() as any)} />);
+    await waitFor(() => expect(screen.getByTestId('undo-button')).toBeTruthy());
+
+    // Both remain reachable by name, not by icon alone.
+    expect(screen.getByLabelText('Undo')).toBeTruthy();
+    expect(screen.getByLabelText('Clear')).toBeTruthy();
+
+    // Clear resets the drawn signature, so submitting afterwards is blocked
+    // again by the existing validation rather than sending empty strokes.
+    fireEvent.press(screen.getByTestId('signature-pad'));
+    fireEvent.changeText(screen.getByTestId('signer-name-input'), 'Jane Customer');
+    fireEvent.press(screen.getByTestId('clear-button'));
+    fireEvent.press(screen.getByTestId('submit-signature-button'));
+
+    await waitFor(() => expect(screen.getByText('Please draw the customer signature before submitting.')).toBeTruthy());
+    expect(createReturnSignature).not.toHaveBeenCalled();
+  });
+
+  it('goes back without creating, signing or mutating the return', async () => {
+    const props = buildProps('return-42');
+    render(<CustomerSignatureScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('signature-back-button')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('signature-back-button'));
+
+    expect(props.navigation.goBack).toHaveBeenCalledTimes(1);
+    expect(createReturnSignature).not.toHaveBeenCalled();
+    expect(props.navigation.replace).not.toHaveBeenCalled();
   });
 });

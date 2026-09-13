@@ -4,6 +4,7 @@ import { PanResponder, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import type { SignaturePoint, SignatureStroke } from '../returns/types';
+import { colors, radius } from '../theme/tokens';
 
 export interface SignaturePadHandle {
   clear: () => void;
@@ -190,7 +191,7 @@ const SignaturePad = forwardRef<SignaturePadHandle, Props>(function SignaturePad
             <Path
               key={index}
               d={strokeToPath(stroke, size.width, size.height)}
-              stroke="#111827"
+              stroke={INK_COLOR}
               strokeWidth={3}
               fill="none"
               strokeLinecap="round"
@@ -205,14 +206,22 @@ const SignaturePad = forwardRef<SignaturePadHandle, Props>(function SignaturePad
 
 export default SignaturePad;
 
+/**
+ * Presentation only. The captured strokes are normalized (0..1) points and the
+ * backend renders its own SVG from them, so the ink colour here never reaches
+ * the payload or the stored signature.
+ */
+const INK_COLOR = colors.text;
+
 const styles = StyleSheet.create({
   pad: {
     width: '100%',
     height: 220,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: radius.lg,
     overflow: 'hidden',
   },
 });

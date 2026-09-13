@@ -44,7 +44,7 @@ export default function AppNavigator() {
             <Stack.Screen
               name="CustomerSignature"
               component={CustomerSignatureScreen}
-              options={{ title: 'Customer Signature', headerBackVisible: false }}
+              options={{ title: 'Customer Signature', headerShown: false }}
             />
           </>
         ) : (
