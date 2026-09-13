@@ -15,7 +15,14 @@ export type RootStackParamList = {
   ReturnList: undefined;
   Profile: undefined;
   CreateReturn: undefined;
-  ReturnDetails: { returnId: string };
+  /**
+   * `origin: 'created'` marks the one arrival that completes the guided
+   * new-return flow, so Return Details can present itself as Step 4 of
+   * that flow. Every other arrival — a row in My Returns, or finishing the
+   * add-more-photos-later flow — omits it and gets the plain details view.
+   * It only chooses a presentation; no workflow state is carried or kept.
+   */
+  ReturnDetails: { returnId: string; origin?: 'created' };
   AddReturnPhotos: { returnId: string; origin: 'created' | 'details' };
   CustomerSignature: { returnId: string };
 };

@@ -26,6 +26,8 @@ interface RequestOptions {
    * error handling as every other call; only the response decoding differs.
    */
   raw?: boolean;
+  /** Like {@link RequestOptions.raw}, but decoded as text — for SVG media. */
+  rawText?: boolean;
 }
 
 /**
@@ -67,7 +69,7 @@ async function rawRequest<T>(path: string, options: RequestOptions, accessToken?
     response = await fetch(await toUrl(path), {
       method: options.method ?? 'GET',
       headers: {
-        Accept: options.raw ? '*/*' : 'application/json',
+        Accept: options.raw || options.rawText ? '*/*' : 'application/json',
         ...(options.multipart ? {} : { 'Content-Type': 'application/json' }),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
@@ -93,6 +95,9 @@ async function rawRequest<T>(path: string, options: RequestOptions, accessToken?
   }
   if (options.raw) {
     return (await response.blob()) as T;
+  }
+  if (options.rawText) {
+    return (await response.text()) as T;
   }
   return (await response.json()) as T;
 }
@@ -181,4 +186,15 @@ export function authorizedMultipartRequest<T>(path: string, formData: FormData):
  */
 export function authorizedMediaRequest(path: string): Promise<Blob> {
   return authorizedRequest<Blob>(path, { raw: true });
+}
+
+/**
+ * Authenticated media fetch decoded as text — the customer signature is a
+ * server-generated SVG document, which React Native's `Image` cannot render,
+ * so it is fetched as markup and drawn with `react-native-svg`. Same
+ * {@link authorizedRequest} path as everything else: same bearer token in the
+ * header, same refresh-and-retry-once, same safe errors.
+ */
+export function authorizedMediaText(path: string): Promise<string> {
+  return authorizedRequest<string>(path, { rawText: true });
 }

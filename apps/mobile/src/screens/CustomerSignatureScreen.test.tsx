@@ -131,7 +131,7 @@ describe('CustomerSignatureScreen', () => {
     expect(payload.signerName).toBe('John Smith');
     expect(Object.keys(payload)).toEqual(['signerName', 'strokes']);
 
-    await waitFor(() => expect(props.navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-1' }));
+    await waitFor(() => expect(props.navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-1', origin: 'created' }));
   });
 
   it('prevents a duplicate submission while the first one is still in flight', async () => {
@@ -180,7 +180,7 @@ describe('CustomerSignatureScreen', () => {
 
     fireEvent.press(screen.getByTestId('go-to-details-button'));
 
-    expect(props.navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-1' });
+    expect(props.navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-1', origin: 'created' });
     expect(createReturnSignature).not.toHaveBeenCalled();
   });
 

@@ -10,49 +10,15 @@ import ErrorMessage from '../components/ErrorMessage';
 import { Icon } from '../components/Icon';
 import LoadingView from '../components/LoadingView';
 import type { RootStackParamList } from '../navigation/types';
-import { formatDateTime, formatQuantityAndUnit, REASON_LABELS, STATUS_LABELS } from '../returns/returnOptions';
+import { formatDateTime, formatQuantityAndUnit, REASON_LABELS } from '../returns/returnOptions';
 import { listReturns } from '../returns/returnService';
-import type { ReturnRecord, ReturnStatus } from '../returns/types';
+import { statusLabel, statusPresentation } from '../returns/statusPresentation';
+import type { ReturnRecord } from '../returns/types';
 import { colors, radius, spacing } from '../theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ReturnList'>;
 
 type ScreenState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; returns: ReturnRecord[] };
-
-/**
- * Badge colours for every status in the lifecycle, in the same semantics the
- * Web app uses: awaiting warehouse amber, in review blue, closed green,
- * cancelled red. A total `Record<ReturnStatus, …>` deliberately, matching
- * `REASON_LABELS`: adding a backend status without giving it a badge here is a
- * TypeScript error rather than an unstyled badge. The label itself always
- * comes from `STATUS_LABELS`, never a literal.
- */
-const STATUS_BADGE: Record<ReturnStatus, { color: string; background: string }> = {
-  AWAITING_WAREHOUSE: { color: colors.warning, background: colors.warningSurface },
-  IN_REVIEW: { color: colors.info, background: colors.infoSurface },
-  CLOSED: { color: colors.success, background: colors.successSurface },
-  CANCELLED: { color: colors.danger, background: colors.dangerSurface },
-};
-
-/** Neutral treatment for a status outside the compiled contract — see {@link statusPresentation}. */
-const UNKNOWN_STATUS_BADGE = { color: colors.muted, background: colors.surfaceRaised };
-
-/**
- * The maps above are total over `ReturnStatus`, but the API is the runtime
- * source of truth: a status added to the backend before this client is rebuilt
- * arrives as a string outside the compiled union. These lookups keep such a
- * record readable — a neutral badge carrying the raw value — instead of
- * crashing the whole list, which is exactly what an unguarded lookup did.
- * Known statuses stay explicit, so none is ever silently given the wrong
- * semantic colour.
- */
-function statusPresentation(status: ReturnStatus) {
-  return STATUS_BADGE[status] ?? UNKNOWN_STATUS_BADGE;
-}
-
-function statusLabel(status: ReturnStatus): string {
-  return STATUS_LABELS[status] ?? String(status);
-}
 
 /** The muted rule separating two metadata values, as in the approved design. */
 function MetaDivider() {
