@@ -67,7 +67,10 @@ export default function CustomerSignatureScreen({ navigation, route }: Props) {
   }, [load]);
 
   const goToDetails = useCallback(() => {
-    navigation.replace('ReturnDetails', { returnId });
+    // `replace`, so back never returns into the just-submitted signature.
+    // `origin: 'created'` only tells Return Details to present itself as the
+    // guided flow's Review step.
+    navigation.replace('ReturnDetails', { returnId, origin: 'created' });
   }, [navigation, returnId]);
 
   const handleClear = useCallback(() => {
