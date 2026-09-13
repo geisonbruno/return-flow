@@ -38,7 +38,7 @@ export default function AppNavigator() {
                 showing two competing titles. Every other route keeps it. */}
             <Stack.Screen name="ReturnList" component={ReturnListScreen} options={{ title: 'My Returns', headerShown: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile', headerShown: false }} />
-            <Stack.Screen name="CreateReturn" component={CreateReturnScreen} options={{ title: 'New Return' }} />
+            <Stack.Screen name="CreateReturn" component={CreateReturnScreen} options={{ title: 'New Return', headerShown: false }} />
             <Stack.Screen name="ReturnDetails" component={ReturnDetailsScreen} options={{ title: 'Return Details' }} />
             <Stack.Screen name="AddReturnPhotos" component={AddReturnPhotosScreen} options={{ title: 'Add Photos', headerBackVisible: false }} />
             <Stack.Screen
