@@ -1,18 +1,31 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, toSafeErrorMessage } from '../api/problemDetails';
+import { Icon } from '../components/Icon';
 import type { SignaturePadHandle } from '../components/SignaturePad';
 import SignaturePad from '../components/SignaturePad';
 import ErrorMessage from '../components/ErrorMessage';
 import LoadingView from '../components/LoadingView';
+import StepIndicator from '../components/StepIndicator';
 import type { RootStackParamList } from '../navigation/types';
 import { formatQuantityAndUnit, REASON_LABELS } from '../returns/returnOptions';
 import { createReturnSignature, getReturn } from '../returns/returnService';
 import { hasMeaningfulSignature, validateSignerName } from '../returns/signatureValidation';
 import type { ReturnRecord, SignatureStroke } from '../returns/types';
+import { colors, radius, spacing } from '../theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CustomerSignature'>;
 
@@ -100,19 +113,41 @@ export default function CustomerSignatureScreen({ navigation, route }: Props) {
     }
   }, [goToDetails, returnId, signerName, strokes, submitting]);
 
+  const screenHeader = (
+    <View style={styles.header}>
+      <Pressable
+        style={styles.back}
+        onPress={() => navigation.goBack()}
+        disabled={submitting}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        hitSlop={8}
+        testID="signature-back-button"
+      >
+        <Icon name="chevron-left" size={22} color={colors.text} />
+      </Pressable>
+      <Text style={styles.title} accessibilityRole="header">
+        Customer Signature
+      </Text>
+      {/* Balances the back control so the title stays centred. */}
+      <View style={styles.back} />
+    </View>
+  );
+
   if (state.status === 'loading') {
-    return <LoadingView label="Loading return…" />;
+    return <LoadingView label="Loading return…" tone="dark" />;
   }
 
   if (state.status === 'error') {
-    return <ErrorMessage message={state.message} onRetry={() => void load()} />;
+    return <ErrorMessage message={state.message} onRetry={() => void load()} tone="dark" />;
   }
 
   const { record } = state;
 
   if (record.signature) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+        {screenHeader}
         <View style={styles.centered}>
           <Text style={styles.capturedTitle}>Signature already captured</Text>
           <Text style={styles.capturedSubtitle}>
@@ -129,82 +164,113 @@ export default function CustomerSignatureScreen({ navigation, route }: Props) {
   const submitDisabled = submitting;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        scrollEnabled={!drawing}
-        testID="signature-scroll"
-      >
-        <Text style={styles.subtitle}>Ask the customer to review and sign below to complete this return.</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+      {screenHeader}
 
-        <View style={styles.summaryCard}>
-          <SummaryRow label="Return" value={record.returnNumber} />
-          <SummaryRow label="Customer" value={record.customerName} />
-          <SummaryRow label="Product" value={record.productName} />
-          <SummaryRow label="Quantity" value={formatQuantityAndUnit(record.quantity, record.unit)} />
-          <SummaryRow label="Reason" value={REASON_LABELS[record.reason]} />
-        </View>
+      {/* Step 3 of the guided flow: Details and Photos are behind us. */}
+      <StepIndicator currentStep={3} />
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Customer representative name</Text>
-          <TextInput
-            style={styles.input}
-            value={signerName}
-            onChangeText={(text) => {
-              setSignerName(text);
-              if (signerNameError) {
-                setSignerNameError(undefined);
-              }
-            }}
-            editable={!submitting}
-            accessibilityLabel="Customer representative name"
-            testID="signer-name-input"
-          />
-          {signerNameError ? <Text style={styles.fieldError}>{signerNameError}</Text> : null}
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Customer signature</Text>
-          <SignaturePad
-            ref={padRef}
-            testID="signature-pad"
-            onDrawingActiveChange={setDrawing}
-            onStrokesChange={(next) => {
-              setStrokes(next);
-              if (signatureError) {
-                setSignatureError(undefined);
-              }
-            }}
-          />
-          {signatureError ? <Text style={styles.fieldError}>{signatureError}</Text> : null}
-
-          <View style={styles.padActions}>
-            <Pressable onPress={handleUndo} disabled={submitting} accessibilityRole="button" testID="undo-button">
-              <Text style={styles.padActionLabel}>Undo</Text>
-            </Pressable>
-            <Pressable onPress={handleClear} disabled={submitting} accessibilityRole="button" testID="clear-button">
-              <Text style={styles.padActionLabel}>Clear</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {submitError ? (
-          <Text style={styles.submitError} accessibilityRole="alert">
-            {submitError}
-          </Text>
-        ) : null}
-
-        <Pressable
-          style={[styles.primaryButton, submitDisabled && styles.primaryButtonDisabled]}
-          onPress={() => void handleSubmit()}
-          disabled={submitDisabled}
-          accessibilityRole="button"
-          testID="submit-signature-button"
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={!drawing}
+          showsVerticalScrollIndicator={false}
+          testID="signature-scroll"
         >
-          {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonLabel}>Submit signature</Text>}
-        </Pressable>
-      </ScrollView>
+          <View style={styles.summaryCard}>
+            <SummaryRow label="Return" value={record.returnNumber} />
+            <SummaryRow label="Customer" value={record.customerName} />
+            <SummaryRow label="Product" value={record.productName} />
+            <SummaryRow label="Quantity" value={formatQuantityAndUnit(record.quantity, record.unit)} />
+            <SummaryRow label="Reason" value={REASON_LABELS[record.reason]} />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Customer representative name</Text>
+            <TextInput
+              style={styles.input}
+              value={signerName}
+              onChangeText={(text) => {
+                setSignerName(text);
+                if (signerNameError) {
+                  setSignerNameError(undefined);
+                }
+              }}
+              editable={!submitting}
+              accessibilityLabel="Customer representative name"
+              testID="signer-name-input"
+              placeholder="Enter name"
+              placeholderTextColor={colors.muted}
+            />
+            {signerNameError ? <Text style={styles.fieldError}>{signerNameError}</Text> : null}
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Customer signature</Text>
+            <SignaturePad
+              ref={padRef}
+              testID="signature-pad"
+              onDrawingActiveChange={setDrawing}
+              onStrokesChange={(next) => {
+                setStrokes(next);
+                if (signatureError) {
+                  setSignatureError(undefined);
+                }
+              }}
+            />
+            {signatureError ? <Text style={styles.fieldError}>{signatureError}</Text> : null}
+
+            <View style={styles.padActions}>
+              <Pressable
+                style={styles.padAction}
+                onPress={handleUndo}
+                disabled={submitting}
+                accessibilityRole="button"
+                accessibilityLabel="Undo"
+                hitSlop={8}
+                testID="undo-button"
+              >
+                <Icon name="undo" size={16} color={colors.muted} />
+                <Text style={styles.padActionLabel}>Undo</Text>
+              </Pressable>
+              <Pressable
+                style={styles.padAction}
+                onPress={handleClear}
+                disabled={submitting}
+                accessibilityRole="button"
+                accessibilityLabel="Clear"
+                hitSlop={8}
+                testID="clear-button"
+              >
+                <Icon name="trash" size={16} color={colors.muted} />
+                <Text style={styles.padActionLabel}>Clear</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {submitError ? (
+            <Text style={styles.submitError} accessibilityRole="alert">
+              {submitError}
+            </Text>
+          ) : null}
+
+          <Pressable
+            style={[styles.primaryButton, submitDisabled && styles.primaryButtonDisabled]}
+            onPress={() => void handleSubmit()}
+            disabled={submitDisabled}
+            accessibilityRole="button"
+            accessibilityLabel="Submit signature"
+            testID="submit-signature-button"
+          >
+            {submitting ? (
+              <ActivityIndicator color={colors.page} />
+            ) : (
+              <Text style={styles.primaryButtonLabel}>Submit signature</Text>
+            )}
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -221,108 +287,145 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.page,
+  },
+  flex: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  back: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    padding: 24,
+    gap: spacing.lg,
+    padding: spacing.xl,
   },
   capturedTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text,
   },
   capturedSubtitle: {
     fontSize: 15,
-    color: '#4B5563',
+    lineHeight: 21,
+    color: colors.muted,
     textAlign: 'center',
   },
   content: {
-    padding: 16,
-    gap: 16,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#374151',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
   },
   summaryCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 12,
-    gap: 6,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    alignItems: 'flex-start',
+    gap: spacing.md,
   },
   summaryLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
+    color: colors.muted,
   },
   summaryValue: {
     fontSize: 13,
-    color: '#111827',
+    fontWeight: '600',
+    color: colors.text,
     flexShrink: 1,
     textAlign: 'right',
   },
   field: {
-    gap: 6,
+    gap: spacing.sm,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.text,
   },
   input: {
+    minHeight: 50,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceRaised,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
+    fontSize: 15,
+    color: colors.text,
   },
   fieldError: {
     fontSize: 13,
-    color: '#B91C1C',
+    color: colors.danger,
   },
   padActions: {
     flexDirection: 'row',
-    gap: 20,
-    marginTop: 4,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: spacing.xs,
+  },
+  padAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 44,
+    paddingHorizontal: spacing.xs,
   },
   padActionLabel: {
-    color: '#2563EB',
+    color: colors.muted,
     fontWeight: '600',
     fontSize: 14,
   },
   submitError: {
     fontSize: 14,
-    color: '#B91C1C',
-    textAlign: 'center',
+    lineHeight: 20,
+    color: colors.danger,
+    backgroundColor: colors.dangerSurface,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
   },
   primaryButton: {
-    backgroundColor: '#2563EB',
-    borderRadius: 8,
-    paddingVertical: 14,
+    backgroundColor: colors.green,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md + 3,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
-    marginBottom: 24,
+    minHeight: 52,
   },
   primaryButtonDisabled: {
     opacity: 0.6,
   },
   primaryButtonLabel: {
-    color: '#FFFFFF',
+    color: colors.page,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
