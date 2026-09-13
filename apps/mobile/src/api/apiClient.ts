@@ -19,6 +19,13 @@ interface RequestOptions {
    * not here.
    */
   multipart?: boolean;
+  /**
+   * When true the raw {@code Blob} is returned instead of parsed JSON — for
+   * the authenticated media endpoints, whose bodies are image bytes. The
+   * request still goes through the same authorization, refresh-and-retry and
+   * error handling as every other call; only the response decoding differs.
+   */
+  raw?: boolean;
 }
 
 /**
@@ -60,7 +67,7 @@ async function rawRequest<T>(path: string, options: RequestOptions, accessToken?
     response = await fetch(await toUrl(path), {
       method: options.method ?? 'GET',
       headers: {
-        Accept: 'application/json',
+        Accept: options.raw ? '*/*' : 'application/json',
         ...(options.multipart ? {} : { 'Content-Type': 'application/json' }),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       },
@@ -83,6 +90,9 @@ async function rawRequest<T>(path: string, options: RequestOptions, accessToken?
   }
   if (response.status === 204) {
     return undefined as T;
+  }
+  if (options.raw) {
+    return (await response.blob()) as T;
   }
   return (await response.json()) as T;
 }
@@ -159,4 +169,16 @@ export function authorizedRequestJson<T>(path: string, options: RequestOptions =
  */
 export function authorizedMultipartRequest<T>(path: string, formData: FormData): Promise<T> {
   return authorizedRequest<T>(path, { method: 'POST', body: formData, multipart: true });
+}
+
+/**
+ * Authenticated media fetch, returning the raw bytes. Private photo and
+ * signature content sits behind the same bearer-token endpoints as everything
+ * else, so it reuses {@link authorizedRequest} wholesale — the same
+ * refresh-and-retry-once, the same session-expiry handling, the same safe
+ * errors. The token therefore stays in the Authorization header and never
+ * reaches a URL, and no public media endpoint is introduced.
+ */
+export function authorizedMediaRequest(path: string): Promise<Blob> {
+  return authorizedRequest<Blob>(path, { raw: true });
 }

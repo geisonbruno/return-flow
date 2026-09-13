@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import * as ImagePicker from 'expo-image-picker';
 import React from 'react';
 
+import { authorizedMediaRequest } from '../api/apiClient';
 import { normalizePhotoToJpeg } from '../returns/photoNormalization';
 import { createReturn, listReturnPhotos, uploadReturnPhoto } from '../returns/returnService';
 import AddReturnPhotosScreen from './AddReturnPhotosScreen';
@@ -23,12 +24,14 @@ jest.mock('../returns/returnService', () => ({
   createReturn: jest.fn(),
 }));
 
+jest.mock('../api/apiClient', () => ({ authorizedMediaRequest: jest.fn() }));
+
 const ASSET = { uri: 'file:///picked.jpg', width: 1200, height: 900 };
 const NORMALIZED = { uri: 'file:///normalized.jpg', width: 1200, height: 900, contentType: 'image/jpeg' as const, sizeBytes: 1000 };
 
 function buildProps(returnId = 'return-1', origin: 'created' | 'details' = 'details') {
   return {
-    navigation: { replace: jest.fn(), navigate: jest.fn() },
+    navigation: { replace: jest.fn(), navigate: jest.fn(), goBack: jest.fn() },
     route: { params: { returnId, origin } },
   };
 }
@@ -43,6 +46,10 @@ describe('AddReturnPhotosScreen', () => {
     (ImagePicker.launchCameraAsync as jest.Mock).mockResolvedValue({ canceled: false, assets: [ASSET] });
     (normalizePhotoToJpeg as jest.Mock).mockResolvedValue(NORMALIZED);
     (uploadReturnPhoto as jest.Mock).mockResolvedValue({ id: 'photo-1', contentType: 'image/jpeg', sizeBytes: 1000, position: 1, contentPath: '/x', createdAt: '' });
+    // Left pending by default: tests that are not about thumbnails then have
+    // no late media state update to await, and their assertions stay about the
+    // behaviour they actually cover. The thumbnail tests below opt in.
+    (authorizedMediaRequest as jest.Mock).mockReturnValue(new Promise(() => {}));
   });
 
   it(
@@ -426,5 +433,138 @@ describe('AddReturnPhotosScreen', () => {
     fireEvent.press(screen.getByTestId('finish-button'));
 
     expect(props.navigation.replace).toHaveBeenCalledWith('ReturnDetails', { returnId: 'return-42' });
+  });
+
+  it('frames the screen as step 2 of the guided flow, with Details already completed', async () => {
+    render(<AddReturnPhotosScreen {...(buildProps('return-42', 'created') as any)} />);
+    await waitFor(() => expect(screen.getByTestId('photo-count')).toBeTruthy());
+
+    expect(screen.getByRole('header', { name: 'Add Photos' })).toBeTruthy();
+    expect(screen.getByTestId('step-indicator')).toBeTruthy();
+    for (const label of ['Details', 'Photos', 'Signature', 'Review']) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+
+    expect(screen.getByLabelText('Step 1 of 4, Details, completed')).toBeTruthy();
+    expect(screen.getByLabelText('Step 2 of 4, Photos, current')).toBeTruthy();
+    expect(screen.getByLabelText('Step 3 of 4, Signature, upcoming')).toBeTruthy();
+    expect(screen.getByLabelText('Step 4 of 4, Review, upcoming')).toBeTruthy();
+
+    expect(screen.getByTestId('step-2').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('step-1').props.accessibilityState.selected).toBe(false);
+  });
+
+  it('shows the empty photo placeholder only while no photo exists', async () => {
+    (authorizedMediaRequest as jest.Mock).mockResolvedValue(new Blob(['jpeg-bytes'], { type: 'image/jpeg' }));
+    render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
+    await waitFor(() => expect(screen.getByTestId('photo-placeholder')).toBeTruthy());
+    expect(screen.getByText(/Add photos of the item, packaging/)).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('add-from-library-button'));
+
+    // Once a photo exists the large placeholder gives way to the thumbnails.
+    await waitFor(() => expect(screen.getByTestId('uploaded-photo-image-1')).toBeTruthy());
+    expect(screen.queryByTestId('photo-placeholder')).toBeNull();
+  });
+
+  it('reports the real uploaded count rather than a fixed zero', async () => {
+    (authorizedMediaRequest as jest.Mock).mockResolvedValue(new Blob(['jpeg-bytes'], { type: 'image/jpeg' }));
+    (listReturnPhotos as jest.Mock).mockResolvedValue([
+      { id: 'p1', contentType: 'image/jpeg', sizeBytes: 1, position: 1, contentPath: '/a', createdAt: '' },
+      { id: 'p2', contentType: 'image/jpeg', sizeBytes: 1, position: 2, contentPath: '/b', createdAt: '' },
+      { id: 'p3', contentType: 'image/jpeg', sizeBytes: 1, position: 3, contentPath: '/c', createdAt: '' },
+    ]);
+    render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
+
+    await waitFor(() => expect(screen.getByTestId('photo-count').props.children.join('')).toBe('3 of 5 photos uploaded'));
+    await waitFor(() => expect(screen.getByTestId('uploaded-photo-image-3')).toBeTruthy());
+  });
+
+  it('sends Continue into the existing Signature step for the real return, in the created flow', async () => {
+    const props = buildProps('return-42', 'created');
+    render(<AddReturnPhotosScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('finish-button')).toBeTruthy());
+
+    expect(screen.getByText('Continue')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('finish-button'));
+
+    expect(props.navigation.replace).toHaveBeenCalledWith('CustomerSignature', { returnId: 'return-42' });
+  });
+
+  it('gives Skip for now the same destination as Continue, with no extra side effect', async () => {
+    const props = buildProps('return-42', 'created');
+    render(<AddReturnPhotosScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('skip-button')).toBeTruthy());
+
+    expect(screen.getByText('Skip for now')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('skip-button'));
+
+    // Both express different intent but share one transition; no "skipped"
+    // state is invented, and nothing is uploaded.
+    expect(props.navigation.replace).toHaveBeenCalledWith('CustomerSignature', { returnId: 'return-42' });
+    expect(uploadReturnPhoto).not.toHaveBeenCalled();
+  });
+
+  it('goes back without creating another return', async () => {
+    const props = buildProps('return-42', 'created');
+    render(<AddReturnPhotosScreen {...(props as any)} />);
+    await waitFor(() => expect(screen.getByTestId('add-photos-back-button')).toBeTruthy());
+
+    fireEvent.press(screen.getByTestId('add-photos-back-button'));
+
+    expect(props.navigation.goBack).toHaveBeenCalledTimes(1);
+    // The return already exists at this step; back must never re-create it.
+    expect(createReturn).not.toHaveBeenCalled();
+    expect(props.navigation.replace).not.toHaveBeenCalled();
+  });
+
+  it('renders the real authenticated thumbnail for a persisted photo, not a metadata tile', async () => {
+    (authorizedMediaRequest as jest.Mock).mockResolvedValue(new Blob(['jpeg-bytes'], { type: 'image/jpeg' }));
+    (listReturnPhotos as jest.Mock).mockResolvedValue([
+      { id: 'p1', contentType: 'image/jpeg', sizeBytes: 1, position: 1, contentPath: '/api/v1/driver/returns/r1/photos/p1/content', createdAt: '' },
+    ]);
+    render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
+
+    await waitFor(() => expect(screen.getByTestId('uploaded-photo-image-1')).toBeTruthy());
+
+    // Fetched through the authenticated client, so no token or storage key
+    // ever reaches a URL, and the rendered uri is local rather than remote.
+    expect(authorizedMediaRequest).toHaveBeenCalledWith('/api/v1/driver/returns/r1/photos/p1/content');
+    expect(screen.getByTestId('uploaded-photo-image-1').props.source.uri).not.toContain('/api/v1/');
+    // The old metadata-only tile is gone.
+    expect(screen.queryByText('Photo 1')).toBeNull();
+    expect(screen.queryByText('Uploaded')).toBeNull();
+  });
+
+  it('renders every persisted photo in position order', async () => {
+    (authorizedMediaRequest as jest.Mock).mockResolvedValue(new Blob(['jpeg-bytes'], { type: 'image/jpeg' }));
+    (listReturnPhotos as jest.Mock).mockResolvedValue([
+      { id: 'p1', contentType: 'image/jpeg', sizeBytes: 1, position: 1, contentPath: '/a', createdAt: '' },
+      { id: 'p2', contentType: 'image/jpeg', sizeBytes: 1, position: 2, contentPath: '/b', createdAt: '' },
+      { id: 'p3', contentType: 'image/jpeg', sizeBytes: 1, position: 3, contentPath: '/c', createdAt: '' },
+    ]);
+    render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
+
+    await waitFor(() => expect(screen.getByTestId('uploaded-photo-image-3')).toBeTruthy());
+    for (const position of [1, 2, 3]) {
+      expect(screen.getByTestId(`uploaded-photo-${position}`)).toBeTruthy();
+    }
+    expect(screen.getByTestId('photo-count').props.children.join('')).toBe('3 of 5 photos uploaded');
+    // Rendering thumbnails must never trigger an upload.
+    expect(uploadReturnPhoto).not.toHaveBeenCalled();
+  });
+
+  it('keeps the screen usable when a thumbnail cannot be loaded', async () => {
+    (authorizedMediaRequest as jest.Mock).mockRejectedValue(new Error('media offline'));
+    (listReturnPhotos as jest.Mock).mockResolvedValue([
+      { id: 'p1', contentType: 'image/jpeg', sizeBytes: 1, position: 1, contentPath: '/a', createdAt: '' },
+    ]);
+    render(<AddReturnPhotosScreen {...(buildProps() as any)} />);
+
+    await waitFor(() => expect(screen.getByTestId('uploaded-photo-image-1-failed')).toBeTruthy());
+    // A failed photo degrades to a retry tile; the rest of the step still works.
+    expect(screen.getByTestId('photo-count').props.children.join('')).toBe('1 of 5 photos uploaded');
+    expect(screen.getByTestId('add-from-library-button')).toBeTruthy();
+    expect(screen.getByTestId('finish-button')).toBeTruthy();
   });
 });

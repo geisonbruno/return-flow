@@ -5,11 +5,15 @@ import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { toSafeErrorMessage } from '../api/problemDetails';
+import AuthenticatedImage from '../components/AuthenticatedImage';
+import { Icon } from '../components/Icon';
+import StepIndicator from '../components/StepIndicator';
 import type { RootStackParamList } from '../navigation/types';
 import { normalizePhotoToJpeg } from '../returns/photoNormalization';
 import type { NormalizedPhoto } from '../returns/photoNormalization';
 import { listReturnPhotos, uploadReturnPhoto } from '../returns/returnService';
 import type { ReturnPhoto } from '../returns/types';
+import { colors, radius, spacing } from '../theme/tokens';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddReturnPhotos'>;
 
@@ -44,8 +48,8 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
   // so the driver can never queue more than the remaining five-photo slots.
   const capacityUsed = uploadedPhotos.length + queue.length;
   const uploadInProgress = queue.some((item) => item.status === 'uploading' || item.status === 'normalizing');
-  // Finish means "every selected photo is actually uploaded" — a failed or
-  // still-pending item must keep Finish disabled, not just an active upload.
+  // Continue means "every selected photo is actually uploaded" — a failed or
+  // still-pending item must keep it disabled, not just an active upload.
   const hasIncompleteSelections = queue.length > 0;
   const canAddMore = capacityUsed < MAX_PHOTOS;
 
@@ -175,6 +179,10 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
   // navigation history: the primary new-return flow ('created') still needs
   // the customer signature next, while the secondary "add more photos
   // later" flow from Return Details ('details') just returns there.
+  //
+  // Skip for now and Continue deliberately share this one transition: they
+  // express different intent but have no different side effect, and inventing
+  // one (a "photos skipped" flag, say) would mean new backend state.
   const finish = useCallback(() => {
     if (origin === 'created') {
       navigation.replace('CustomerSignature', { returnId });
@@ -183,11 +191,32 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
     }
   }, [navigation, origin, returnId]);
 
+  const screenHeader = (
+    <View style={styles.header}>
+      <Pressable
+        style={styles.back}
+        onPress={() => navigation.goBack()}
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        hitSlop={8}
+        testID="add-photos-back-button"
+      >
+        <Icon name="chevron-left" size={22} color={colors.text} />
+      </Pressable>
+      <Text style={styles.title} accessibilityRole="header">
+        Add Photos
+      </Text>
+      {/* Balances the back control so the title stays centred. */}
+      <View style={styles.back} />
+    </View>
+  );
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+        {screenHeader}
         <View style={styles.centered}>
-          <ActivityIndicator size="large" />
+          <ActivityIndicator size="large" color={colors.green} />
           <Text style={styles.loadingLabel}>Loading photos…</Text>
         </View>
       </SafeAreaView>
@@ -196,7 +225,8 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
 
   if (loadError) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+        {screenHeader}
         <View style={styles.centered}>
           <Text style={styles.errorText}>{loadError}</Text>
           <Pressable style={styles.retryButton} onPress={() => void loadExistingPhotos()} accessibilityRole="button">
@@ -207,9 +237,16 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
     );
   }
 
+  const hasAnyPhoto = uploadedPhotos.length > 0 || queue.length > 0;
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+      {screenHeader}
+
+      {/* Step 2 of the guided flow: Details is behind us, Photos is current. */}
+      <StepIndicator currentStep={2} />
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.subtitle}>
           {origin === 'created'
             ? 'Your return has been created. Add photos now, or skip and add them later.'
@@ -219,105 +256,119 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
           {uploadedCount} of {MAX_PHOTOS} photos uploaded
         </Text>
 
-        <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.actionButton, (!canAddMore || picking) && styles.actionButtonDisabled]}
-            onPress={() => void pickFromLibrary()}
-            disabled={!canAddMore || picking}
-            accessibilityRole="button"
-            testID="add-from-library-button"
-          >
-            <Text style={styles.actionLabel}>Add from library</Text>
-          </Pressable>
-          {Platform.OS !== 'web' ? (
-            <Pressable
-              style={[styles.actionButton, (!canAddMore || picking) && styles.actionButtonDisabled]}
-              onPress={() => void takePhoto()}
-              disabled={!canAddMore || picking}
-              accessibilityRole="button"
-              testID="take-photo-button"
-            >
-              <Text style={styles.actionLabel}>Take photo</Text>
-            </Pressable>
-          ) : null}
-        </View>
+        {hasAnyPhoto ? (
+          <View style={styles.thumbnailGrid}>
+            {uploadedPhotos.map((photo) => (
+              <View key={photo.id} style={styles.thumbnailCard} testID={`uploaded-photo-${photo.position}`}>
+                {/* The real image, fetched through the authenticated content
+                    endpoint — the driver can see what is actually attached. */}
+                <AuthenticatedImage
+                  contentPath={photo.contentPath}
+                  accessibilityLabel={`Photo ${photo.position}`}
+                  style={styles.thumbnailImage}
+                  testID={`uploaded-photo-image-${photo.position}`}
+                />
+              </View>
+            ))}
+            {queue.map((item) => (
+              <View key={item.localId} style={styles.thumbnailCard} testID="queued-photo">
+                <Image source={{ uri: item.uri }} style={styles.thumbnailImage} />
+                {item.status === 'normalizing' || item.status === 'uploading' ? (
+                  <View style={styles.thumbnailOverlay}>
+                    <ActivityIndicator color="#FFFFFF" />
+                    <Text style={styles.thumbnailOverlayLabel}>{item.status === 'normalizing' ? 'Preparing…' : 'Uploading…'}</Text>
+                  </View>
+                ) : null}
+                {item.status === 'failed' ? (
+                  <View style={styles.thumbnailFailed}>
+                    <Text style={styles.failedText}>{item.errorMessage}</Text>
+                    <View style={styles.failedActions}>
+                      <Pressable
+                        onPress={() => retryQueuedPhoto(item.localId)}
+                        accessibilityRole="button"
+                        testID={`retry-${item.localId}`}
+                      >
+                        <Text style={styles.retryInlineLabel}>Retry</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => removeQueuedPhoto(item.localId)}
+                        accessibilityRole="button"
+                        testID={`remove-${item.localId}`}
+                      >
+                        <Text style={styles.removeInlineLabel}>Remove</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : null}
+                {item.status !== 'failed' && item.status !== 'uploading' ? (
+                  <Pressable
+                    style={styles.removeButton}
+                    onPress={() => removeQueuedPhoto(item.localId)}
+                    accessibilityRole="button"
+                    testID={`remove-${item.localId}`}
+                  >
+                    <Text style={styles.removeButtonLabel}>Remove</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.placeholder} testID="photo-placeholder">
+            <Icon name="camera" size={30} color={colors.muted} />
+            <Text style={styles.placeholderText}>Add photos of the item, packaging{'\n'}or any relevant details.</Text>
+          </View>
+        )}
 
         {permissionMessage ? <Text style={styles.permissionMessage}>{permissionMessage}</Text> : null}
         {!canAddMore ? <Text style={styles.limitMessage}>You have reached the five-photo limit.</Text> : null}
 
-        <View style={styles.thumbnailGrid}>
-          {uploadedPhotos.map((photo) => (
-            <View key={photo.id} style={styles.thumbnailCard} testID={`uploaded-photo-${photo.position}`}>
-              <View style={styles.uploadedBadge}>
-                <Text style={styles.uploadedBadgeLabel}>Uploaded</Text>
-              </View>
-              <Text style={styles.thumbnailPosition}>Photo {photo.position}</Text>
-            </View>
-          ))}
-          {queue.map((item) => (
-            <View key={item.localId} style={styles.thumbnailCard} testID="queued-photo">
-              <Image source={{ uri: item.uri }} style={styles.thumbnailImage} />
-              {item.status === 'normalizing' || item.status === 'uploading' ? (
-                <View style={styles.thumbnailOverlay}>
-                  <ActivityIndicator color="#FFFFFF" />
-                  <Text style={styles.thumbnailOverlayLabel}>{item.status === 'normalizing' ? 'Preparing…' : 'Uploading…'}</Text>
-                </View>
-              ) : null}
-              {item.status === 'failed' ? (
-                <View style={styles.thumbnailFailed}>
-                  <Text style={styles.failedText}>{item.errorMessage}</Text>
-                  <View style={styles.failedActions}>
-                    <Pressable
-                      onPress={() => retryQueuedPhoto(item.localId)}
-                      accessibilityRole="button"
-                      testID={`retry-${item.localId}`}
-                    >
-                      <Text style={styles.retryInlineLabel}>Retry</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => removeQueuedPhoto(item.localId)}
-                      accessibilityRole="button"
-                      testID={`remove-${item.localId}`}
-                    >
-                      <Text style={styles.removeInlineLabel}>Remove</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : null}
-              {item.status !== 'failed' && item.status !== 'uploading' ? (
-                <Pressable
-                  style={styles.removeButton}
-                  onPress={() => removeQueuedPhoto(item.localId)}
-                  accessibilityRole="button"
-                  testID={`remove-${item.localId}`}
-                >
-                  <Text style={styles.removeButtonLabel}>Remove</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
-        </View>
+        <Pressable
+          style={[styles.actionButton, (!canAddMore || picking) && styles.actionButtonDisabled]}
+          onPress={() => void pickFromLibrary()}
+          disabled={!canAddMore || picking}
+          accessibilityRole="button"
+          accessibilityLabel="Add from library"
+          testID="add-from-library-button"
+        >
+          <Icon name="image" size={19} color={colors.text} />
+          <Text style={styles.actionLabel}>Add from library</Text>
+        </Pressable>
 
-        <View style={styles.footerRow}>
+        {Platform.OS !== 'web' ? (
           <Pressable
-            style={[styles.footerButton, uploadInProgress && styles.actionButtonDisabled]}
-            onPress={finish}
-            disabled={uploadInProgress}
+            style={[styles.actionButton, (!canAddMore || picking) && styles.actionButtonDisabled]}
+            onPress={() => void takePhoto()}
+            disabled={!canAddMore || picking}
             accessibilityRole="button"
-            testID="skip-button"
+            accessibilityLabel="Take photo"
+            testID="take-photo-button"
           >
-            <Text style={styles.footerButtonLabel}>{origin === 'created' ? 'Skip for now' : 'Back'}</Text>
+            <Icon name="camera" size={19} color={colors.text} />
+            <Text style={styles.actionLabel}>Take photo</Text>
           </Pressable>
-          <Pressable
-            style={[styles.footerButton, styles.finishButton, hasIncompleteSelections && styles.actionButtonDisabled]}
-            onPress={finish}
-            disabled={hasIncompleteSelections}
-            accessibilityRole="button"
-            testID="finish-button"
-          >
-            <Text style={[styles.footerButtonLabel, styles.finishButtonLabel]}>Finish</Text>
-          </Pressable>
-        </View>
+        ) : null}
+
+        <Pressable
+          style={[styles.skipButton, uploadInProgress && styles.actionButtonDisabled]}
+          onPress={finish}
+          disabled={uploadInProgress}
+          accessibilityRole="button"
+          testID="skip-button"
+        >
+          <Text style={styles.skipLabel}>{origin === 'created' ? 'Skip for now' : 'Back'}</Text>
+        </Pressable>
+
+        <Pressable
+          style={[styles.continueButton, hasIncompleteSelections && styles.actionButtonDisabled]}
+          onPress={finish}
+          disabled={hasIncompleteSelections}
+          accessibilityRole="button"
+          accessibilityLabel="Continue"
+          testID="finish-button"
+        >
+          <Text style={styles.continueLabel}>Continue</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -326,194 +377,234 @@ export default function AddReturnPhotosScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.page,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  back: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    padding: 24,
+    gap: spacing.md,
+    padding: spacing.xl,
   },
   loadingLabel: {
     fontSize: 15,
-    color: '#4B5563',
+    color: colors.muted,
   },
   errorText: {
     fontSize: 15,
-    color: '#B91C1C',
+    color: colors.danger,
     textAlign: 'center',
   },
   retryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    minHeight: 44,
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    backgroundColor: colors.dangerSurface,
+    paddingHorizontal: spacing.xl,
   },
   retryLabel: {
-    color: '#2563EB',
+    color: colors.danger,
     fontWeight: '600',
   },
   content: {
-    padding: 16,
-    gap: 16,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#374151',
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text,
   },
   countLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 13,
+    color: colors.muted,
   },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#2563EB',
-    borderRadius: 8,
-    paddingVertical: 14,
+  placeholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    gap: spacing.md,
+    minHeight: 168,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
   },
-  actionButtonDisabled: {
-    opacity: 0.5,
-  },
-  actionLabel: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  permissionMessage: {
-    fontSize: 14,
-    color: '#B91C1C',
-  },
-  limitMessage: {
-    fontSize: 14,
-    color: '#6B7280',
+  placeholderText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.muted,
+    textAlign: 'center',
   },
   thumbnailGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: spacing.md,
   },
   thumbnailCard: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    overflow: 'hidden',
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
+    width: 104,
+    height: 104,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
   },
   thumbnailImage: {
     width: '100%',
     height: '100%',
   },
+  thumbnailPosition: {
+    fontSize: 12,
+    color: colors.text,
+  },
+  uploadedBadge: {
+    borderRadius: 999,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    backgroundColor: colors.greenDark,
+  },
+  uploadedBadgeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.green,
+  },
   thumbnailOverlay: {
     position: 'absolute',
     top: 0,
-    left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: spacing.xs,
+    backgroundColor: 'rgba(4, 8, 11, 0.7)',
   },
   thumbnailOverlayLabel: {
-    color: '#FFFFFF',
     fontSize: 11,
+    color: '#FFFFFF',
   },
   thumbnailFailed: {
     position: 'absolute',
     top: 0,
-    left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(185,28,28,0.85)',
+    left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 6,
-    gap: 6,
+    gap: spacing.xs,
+    padding: spacing.xs,
+    backgroundColor: colors.dangerSurface,
   },
   failedText: {
-    color: '#FFFFFF',
     fontSize: 10,
+    lineHeight: 14,
+    color: colors.danger,
     textAlign: 'center',
   },
   failedActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: spacing.md,
   },
   retryInlineLabel: {
-    color: '#FFFFFF',
-    fontWeight: '700',
     fontSize: 12,
+    fontWeight: '700',
+    color: colors.green,
   },
   removeInlineLabel: {
-    color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: '700',
+    color: colors.danger,
   },
   removeButton: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 4,
-    paddingHorizontal: 6,
     paddingVertical: 2,
   },
   removeButtonLabel: {
-    color: '#FFFFFF',
-    fontSize: 11,
-  },
-  uploadedBadge: {
-    backgroundColor: '#DCFCE7',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  uploadedBadgeLabel: {
-    color: '#166534',
-    fontWeight: '600',
     fontSize: 12,
+    color: colors.muted,
   },
-  thumbnailPosition: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#374151',
+  permissionMessage: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.warning,
+    backgroundColor: colors.warningSurface,
+    borderWidth: 1,
+    borderColor: colors.warningBorder,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  footerRow: {
+  limitMessage: {
+    fontSize: 13,
+    color: colors.muted,
+  },
+  actionButton: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  footerButton: {
-    flex: 1,
-    borderRadius: 8,
-    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    gap: spacing.sm,
+    minHeight: 50,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
   },
-  finishButton: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
+  actionButtonDisabled: {
+    opacity: 0.5,
   },
-  footerButtonLabel: {
+  actionLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.text,
   },
-  finishButtonLabel: {
-    color: '#FFFFFF',
+  skipButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  skipLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  continueButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.green,
+    marginTop: spacing.xs,
+  },
+  continueLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.page,
   },
 });
