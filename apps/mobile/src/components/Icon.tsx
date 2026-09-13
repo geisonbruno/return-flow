@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
-export type IconName = 'brand' | 'mail' | 'lock' | 'eye' | 'eye-off' | 'returns' | 'plus' | 'plus-circle' | 'user' | 'chevron-right';
+export type IconName = 'brand' | 'mail' | 'lock' | 'eye' | 'eye-off' | 'returns' | 'plus' | 'plus-circle' | 'user' | 'chevron-right' | 'chevron-left';
 
 /**
  * The mobile app's own line-icon set, drawn with the `react-native-svg` that
@@ -69,6 +69,7 @@ export function Icon({ name, size = 24, color = 'currentColor' }: { name: IconNa
       </>
     ),
     'chevron-right': <Path d="m9 6 6 6-6 6" {...stroke} />,
+    'chevron-left': <Path d="m15 6-6 6 6 6" {...stroke} />,
     'eye-off': (
       <>
         <Path
