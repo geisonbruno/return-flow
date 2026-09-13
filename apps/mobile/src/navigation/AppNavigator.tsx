@@ -40,7 +40,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile', headerShown: false }} />
             <Stack.Screen name="CreateReturn" component={CreateReturnScreen} options={{ title: 'New Return', headerShown: false }} />
             <Stack.Screen name="ReturnDetails" component={ReturnDetailsScreen} options={{ title: 'Return Details' }} />
-            <Stack.Screen name="AddReturnPhotos" component={AddReturnPhotosScreen} options={{ title: 'Add Photos', headerBackVisible: false }} />
+            <Stack.Screen name="AddReturnPhotos" component={AddReturnPhotosScreen} options={{ title: 'Add Photos', headerShown: false }} />
             <Stack.Screen
               name="CustomerSignature"
               component={CustomerSignatureScreen}
