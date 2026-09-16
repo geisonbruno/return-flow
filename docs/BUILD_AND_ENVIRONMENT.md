@@ -54,6 +54,7 @@ Set with `SPRING_PROFILES_ACTIVE`.
 | `DATABASE_PASSWORD` | Database password | Runtime **secret** | **Yes** in `prod` |
 | `ACCESS_TOKEN_SECRET` | HMAC signing key for access tokens; minimum 32 bytes | Runtime **secret** | **Yes** in `prod` |
 | `RETURN_MEDIA_STORAGE_ROOT` | Filesystem path for return photos and signature images | Runtime, non-secret | **Yes** in `prod` |
+| `APP_CORS_ALLOWED_ORIGINS` | Browser origin(s) allowed to call the API cross-origin, comma-separated | Runtime, non-secret | **Yes** in `prod` |
 | `OPERATIONS_BUSINESS_TIMEZONE` | Business timezone for the ADMIN operational day | Runtime, non-secret | No — defaults to `Australia/Sydney` |
 | `BOOTSTRAP_ADMIN_EMAIL` | Email of the first `ADMIN` to provision | Runtime, non-secret | No — see below |
 | `BOOTSTRAP_ADMIN_NAME` | Full name of that first `ADMIN` | Runtime, non-secret | No — see below |
@@ -64,6 +65,7 @@ Notes that matter in production:
 
 - **`ACCESS_TOKEN_SECRET`** has a clearly-labelled development/test-only default in `application.properties` so plain tests can boot. `application-prod.properties` overrides it with **no** default, so production can never silently run on the committed placeholder.
 - **`RETURN_MEDIA_STORAGE_ROOT` must point at durable storage.** A container filesystem is ephemeral: every uploaded photo and signature is lost on the next restart or deploy. No object-storage adapter exists yet — the filesystem adapter sits behind the replaceable `ReturnMediaStorage` interface, and a Cloudflare R2/S3 adapter is the intended successor (root `CLAUDE.md` §14, §29).
+- **`APP_CORS_ALLOWED_ORIGINS` must name the deployed Web app's own origin**, scheme and host exactly as the browser sends it (for example `https://returnflow.example`), comma-separated for more than one. The Web app always runs on a different origin than the API, and a browser discards any cross-origin response that does not carry a matching `Access-Control-Allow-Origin`, so leaving this unset makes every admin call fail — login included. It is deliberately empty by default and has **no** default in `prod`, so a deployment that forgets it fails at startup rather than at an admin's first login. Only the exact origins listed are granted: `*` is rejected outright, and no origin is ever reflected back. Native mobile requests do not go through a browser and need no entry here.
 - **The bootstrap admin is disabled unless all three `BOOTSTRAP_ADMIN_*` values are set together.** It is idempotent and intended for first provisioning only.
 
 ---

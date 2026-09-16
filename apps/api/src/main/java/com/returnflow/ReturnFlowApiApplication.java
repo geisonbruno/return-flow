@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 
 import com.returnflow.auth.AuthSecurityProperties;
+import com.returnflow.auth.security.CorsProperties;
 import com.returnflow.user.BootstrapAdminProperties;
 
 /**
@@ -17,7 +18,7 @@ import com.returnflow.user.BootstrapAdminProperties;
  * startup, which is meaningless noise, not a real authentication path.
  */
 @SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
-@EnableConfigurationProperties({ AuthSecurityProperties.class, BootstrapAdminProperties.class })
+@EnableConfigurationProperties({ AuthSecurityProperties.class, BootstrapAdminProperties.class, CorsProperties.class })
 public class ReturnFlowApiApplication {
 
 	public static void main(String[] args) {
