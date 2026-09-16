@@ -279,15 +279,15 @@ class AuthControllerIntegrationTest {
 		refresh(rawRefreshToken, status().isUnauthorized());
 	}
 
-	// --- CORS profile isolation ---
+	// --- CORS fail-closed default ---
 
 	@Test
-	void corsIsNotEnabledWithoutTheLocalProfileEvenFromTheKnownLocalOrigin() throws Exception {
-		// The app.cors.local-origin allowance (see auth.security.SecurityConfig)
-		// only exists while the "local" Spring profile is active; this test
-		// class runs with no active profile (this project's normal test
-		// default), so even the exact origin "local" would allow must not
-		// receive an Access-Control-Allow-Origin header here.
+	void corsIsNotEnabledWhenNoAllowedOriginIsConfigured() throws Exception {
+		// CORS is granted from app.cors.allowed-origins alone (see
+		// auth.security.CorsProperties), which is empty by default. This test
+		// class configures none, so SecurityConfig registers no CORS handling
+		// at all and no origin — not even the one local development allows —
+		// receives an Access-Control-Allow-Origin header.
 		mockMvc.perform(get("/api/v1/auth/me").header(HttpHeaders.ORIGIN, "http://localhost:8081"))
 				.andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
 	}

@@ -17,13 +17,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Covers only the {@code local}-profile CORS allowance added for Expo Web UX
- * testing (see {@code auth.security.SecurityConfig}). Profile isolation
- * itself — that the same allowed origin gets nothing without the {@code local}
- * profile active — is proven separately by
- * {@code AuthControllerIntegrationTest#corsIsNotEnabledWithoutTheLocalProfileEvenFromTheKnownLocalOrigin()},
- * which deliberately runs with no active profile (this project's normal test
- * default).
+ * Local development's half of the one shared CORS implementation: the
+ * {@code local} profile configures {@code app.cors.allowed-origins} as the
+ * Expo Web dev origin, and everything below must keep working exactly as it
+ * did when this allowance was profile-gated rather than configured.
+ *
+ * <p>{@code ConfiguredOriginCorsIntegrationTest} is the counterpart, proving
+ * the same code grants a deployed-style origin with no profile active at all.
+ * That nothing is granted when no origin is configured is proven separately by
+ * {@code AuthControllerIntegrationTest#corsIsNotEnabledWhenNoAllowedOriginIsConfigured()}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,6 +56,18 @@ class LocalCorsIntegrationTest {
 						.header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Content-Type"))
 				.andExpect(status().isOk())
 				.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, Matchers.containsString("POST")));
+	}
+
+	@Test
+	void preflightResponseAllowsGetPutAndOptionsAsWell() throws Exception {
+		mockMvc.perform(options("/api/v1/auth/login")
+						.header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+						.header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PUT")
+						.header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Content-Type"))
+				.andExpect(status().isOk())
+				.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, Matchers.containsString("GET")))
+				.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, Matchers.containsString("PUT")))
+				.andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, Matchers.containsString("OPTIONS")));
 	}
 
 	@Test

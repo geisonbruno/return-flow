@@ -1,12 +1,9 @@
 package com.returnflow.auth.security;
 
 import java.util.List;
-import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -41,23 +38,28 @@ class SecurityConfig {
 	}
 
 	/**
-	 * Local-development-only CORS allowance so Expo Web (served at
-	 * {@code http://localhost:8081}, a different origin than this API's
-	 * {@code http://localhost:8080}) can call the API from a browser during
-	 * UX testing. Only registered while the {@code local} profile is active
-	 * ({@code app.cors.local-origin} in {@code application-local.properties})
-	 * — no other profile defines this bean, so production/other profiles get
-	 * no CORS allowance from this class at all. Native iOS/Android requests
-	 * never go through a browser and are unaffected either way.
-	 * {@code allowCredentials} stays {@code false}: auth is bearer-token
-	 * based, never browser cookies.
+	 * One CORS configuration for every environment, differing only in which
+	 * origins {@link CorsProperties} carries — local development allows the
+	 * Expo Web dev origin, a deployment allows the deployed Web app's origin,
+	 * and the code is identical in both.
+	 *
+	 * <p>Methods are exactly those the browser client actually issues: the
+	 * Web app reads with {@code GET}, logs in and performs review actions with
+	 * {@code POST}, and edits users and routes with {@code PUT}
+	 * ({@code UserAdminController} and {@code RouteAdminController}'s
+	 * {@code @PutMapping}s). {@code OPTIONS} is the preflight itself. No
+	 * {@code DELETE} or {@code PATCH}: the API exposes neither (V1 has no
+	 * delete operation at all — root {@code CLAUDE.md} §9.5), so allowing them
+	 * would only widen the surface past anything the product can use.
+	 *
+	 * <p>{@code allowCredentials} stays {@code false}: authentication is
+	 * bearer-token based, never browser cookies, so the browser never needs to
+	 * attach credentials to a cross-origin request.
 	 */
-	@Bean
-	@Profile("local")
-	UrlBasedCorsConfigurationSource localCorsConfigurationSource(@Value("${app.cors.local-origin}") String localOrigin) {
+	private static UrlBasedCorsConfigurationSource corsConfigurationSource(List<String> allowedOrigins) {
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(List.of(localOrigin));
-		configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+		configuration.setAllowedOrigins(allowedOrigins);
+		configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "OPTIONS"));
 		configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
 		configuration.setAllowCredentials(false);
 
@@ -69,15 +71,8 @@ class SecurityConfig {
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, AccessTokenService accessTokenService,
 			TenantResolver tenantResolver, RestAuthenticationEntryPoint authenticationEntryPoint,
-			RestAccessDeniedHandler accessDeniedHandler,
-			// Deliberately the concrete UrlBasedCorsConfigurationSource type, not
-			// the broader CorsConfigurationSource interface: Spring MVC's own
-			// auto-configured `mvcHandlerMappingIntrospector` bean also
-			// implements CorsConfigurationSource, so injecting the interface
-			// type here resolves ambiguously (two candidates) the moment any
-			// profile registers this bean. The concrete type only ever matches
-			// localCorsConfigurationSource() above.
-			Optional<UrlBasedCorsConfigurationSource> corsConfigurationSource) throws Exception {
+			RestAccessDeniedHandler accessDeniedHandler, CorsProperties corsProperties) throws Exception {
+		List<String> allowedOrigins = corsProperties.resolveAllowedOrigins();
 		http
 				.csrf(AbstractHttpConfigurer::disable)
 				.httpBasic(AbstractHttpConfigurer::disable)
@@ -105,12 +100,19 @@ class SecurityConfig {
 				.addFilterBefore(new JwtAuthenticationFilter(accessTokenService, tenantResolver),
 						UsernamePasswordAuthenticationFilter.class);
 
-		// Only present (as a bean) while the `local` profile is active — see
-		// localCorsConfigurationSource() above. When configured here, Spring
-		// Security's CorsFilter runs early enough in the chain that a genuine
-		// preflight OPTIONS request is answered directly and never reaches the
-		// authorization rules above, so it can't be rejected by them.
-		corsConfigurationSource.ifPresent(source -> http.cors(cors -> cors.configurationSource(source)));
+		// Registered only when an origin is actually configured, so the default
+		// (nothing configured) leaves the chain with no CORS handling at all and
+		// every cross-origin browser call is denied. Configured here rather than
+		// through a bean Spring Security discovers on its own: Spring MVC's
+		// auto-configured `mvcHandlerMappingIntrospector` also implements
+		// CorsConfigurationSource, so a discovered-by-type lookup is ambiguous.
+		// When configured, Spring Security's CorsFilter runs early enough in the
+		// chain that a genuine preflight OPTIONS request is answered directly and
+		// never reaches the authorization rules above, so it can't be rejected by
+		// them.
+		if (!allowedOrigins.isEmpty()) {
+			http.cors(cors -> cors.configurationSource(corsConfigurationSource(allowedOrigins)));
+		}
 
 		return http.build();
 	}
