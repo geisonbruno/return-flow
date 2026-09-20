@@ -113,6 +113,52 @@ npm test -- --ci --runInBand
 
 `npx expo-doctor` remains a manual dependency-health check, deliberately not a CI step; see `docs/DEVELOPMENT_WORKFLOW.md`.
 
+### Native build configuration (mobile pilot readiness)
+
+`apps/mobile` is prepared for a future native build, but **no build has been produced**. The repository stays on Expo's managed/CNG workflow: there is no committed `ios/` or `android/` directory, and native settings are declared entirely through `app.json` and config plugins. `npx expo start` with Expo Go remains the development workflow.
+
+**Application identity** (`app.json`) — the same identifier on both platforms:
+
+| Field | Value |
+|---|---|
+| `ios.bundleIdentifier` | `com.returnflow.mobile` |
+| `android.package` | `com.returnflow.mobile` |
+
+There is one identifier per platform for this MVP — no separate development/pilot/production identifiers.
+
+**Native permissions** are declared through the `expo-image-picker` config plugin, the app's only camera/photo-library integration:
+
+| Permission | Description shown to the user |
+|---|---|
+| Photo library (`NSPhotoLibraryUsageDescription`) | Allow ReturnFlow to select photos of returned items. |
+| Camera (`NSCameraUsageDescription`) | Allow ReturnFlow to take photos of returned items. |
+
+The plugin's microphone permission is explicitly set to `false`, so `NSMicrophoneUsageDescription` is absent on iOS and `RECORD_AUDIO` is blocked on Android — ReturnFlow records no audio. The only other usage description present is `NSFaceIDUsageDescription`, contributed by the pre-existing `expo-secure-store` plugin. Verify the resolved result at any time without building:
+
+```bash
+cd apps/mobile
+npx expo config --json                   # resolved Expo config
+npx expo config --type introspect --json # resolved native Info.plist / AndroidManifest
+```
+
+**Build profiles** (`apps/mobile/eas.json`):
+
+| Profile | Distribution | Intended use |
+|---|---|---|
+| `preview` | `internal` | Small internal pilot build |
+| `production` | `store` | Later store/TestFlight distribution |
+
+`eas.json` holds **no environment values and no secrets**. The deployed HTTPS API URL must be supplied to the EAS build environment as `EXPO_PUBLIC_API_BASE_URL` before a pilot build is created — it is baked into the binary at build time, so a build made without it cannot reach the deployed API. It is public client configuration, never a secret (see §5).
+
+**Still outstanding before an installable pilot app exists** — none of it done here, and none of it living in this repository:
+
+- an Apple Developer account and signing credentials;
+- EAS project linkage: no `extra.eas.projectId` is set and none was invented, because `eas init` creates it against a real Expo account;
+- the distribution decision — ad-hoc internal distribution (which also needs device registration) or TestFlight — deliberately left open, since both profiles above already exist;
+- the deployed HTTPS API URL itself, which depends on Phase 10B provider selection (not started).
+
+Remote validation of `eas.json` (`eas build --dry-run` and similar) needs an authenticated EAS CLI, so it belongs to that later work; only local static validation was performed here.
+
 ### Mobile environment variables
 
 | Variable | Purpose | Classification | Required |
