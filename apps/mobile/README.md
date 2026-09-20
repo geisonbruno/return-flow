@@ -30,6 +30,25 @@ Expo Doctor is **not** part of `Mobile CI` right now — a permanently-informati
 
 Expo Doctor returns to `Mobile CI` — as a blocking step — only once a focused maintenance task safely gets the project to 18/18. See `PROGRESS.md` Known Issues for the current status.
 
+## Native build configuration
+
+This project is configured for a future native (non-Expo-Go) build, but **no build has been produced yet** and the Expo Go workflow above is unchanged.
+
+- Application identity lives in `app.json`: `ios.bundleIdentifier` and `android.package` are both `com.returnflow.mobile`.
+- Camera and photo-library permission descriptions are declared through the `expo-image-picker` config plugin; the microphone permission is explicitly disabled because ReturnFlow records no audio.
+- `eas.json` defines two build profiles: `preview` (internal distribution, for a small pilot) and `production` (store distribution, for later).
+- There is no committed `ios/` or `android/` directory — native configuration stays declarative. Do not commit generated native projects.
+- `EXPO_PUBLIC_API_BASE_URL` must be supplied to the EAS build environment before a pilot build: it is baked into the binary at build time. Like every `EXPO_PUBLIC_*` value it is public client configuration — **never put a secret in one**.
+
+Check the resolved configuration without building:
+
+```powershell
+npx expo config --json
+npx expo config --type introspect --json
+```
+
+Apple signing, EAS project linkage, device registration or TestFlight setup, and the actual build all remain outstanding. See `docs/BUILD_AND_ENVIRONMENT.md` for the full list.
+
 ## Trying it on a phone (manual walkthrough)
 
 1. **Configure the API URL.** Copy `.env.example` to `.env`. If you're running the app in a web browser or an emulator/simulator on the same machine as the backend, `http://localhost:8080` works. **A physical phone cannot reach the laptop through `localhost`** — that address resolves to the phone itself, not your computer. Instead, set `EXPO_PUBLIC_API_BASE_URL` to your laptop's local-network IP (e.g. `http://192.168.1.23:8080`), found via `ipconfig` (Windows) or `ifconfig`/`ip addr` (macOS/Linux). The phone and laptop must be connected to the **same Wi-Fi network**.
